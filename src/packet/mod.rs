@@ -3,6 +3,9 @@ use std::fmt::Debug;
 
 mod bytes;
 
+pub const MAX_PAYLOAD_SIZE: usize = 512;
+pub const MAX_PACKET_SIZE: usize = MAX_PAYLOAD_SIZE + 2;
+
 /// `Opcode` is an identifier for a TFTP packet. It is always the first
 /// two bytes of a TFTP header.
 #[derive(Copy, Clone, Debug, PartialEq)]
