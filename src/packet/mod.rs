@@ -35,6 +35,35 @@ pub enum Mode {
     Octet,
 }
 
+/// `ErrorCode` represents the error conditions that can be reached during
+/// a regular TFTP operation.
+#[derive(Debug, PartialEq)]
+pub enum ErrorCode {
+    /// Not defined, see error message (if any).
+    NotDefined = 0,
+
+    /// File not found.
+    FileNotFound = 1,
+
+    /// Access violation.
+    AccessViolation = 2,
+
+    /// Disk full or allocation exceeded.
+    DiskFull = 3,
+
+    /// Illegal TFTP operation.
+    IllegalOperation = 4,
+
+    /// Unknown transfer ID.
+    UnknownTid = 5,
+
+    /// File already exists.
+    FileAlreadyExists = 6,
+
+    /// No such user.
+    NoSuchUser = 7,
+}
+
 #[cfg(test)]
 mod tests {
 }

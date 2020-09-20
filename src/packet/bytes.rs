@@ -70,6 +70,30 @@ impl From<Mode> for CString {
     }
 }
 
+impl From<ErrorCode> for u16 {
+    fn from(e: ErrorCode) -> u16 {
+        e as u16
+    }
+}
+
+impl TryFrom<u16> for ErrorCode {
+    type Error = io::Error;
+
+    fn try_from(val: u16) -> Result<ErrorCode> {
+        Ok(match val {
+            e if e == ErrorCode::NotDefined as u16 => ErrorCode::NotDefined,
+            e if e == ErrorCode::FileNotFound as u16 => ErrorCode::FileNotFound,
+            e if e == ErrorCode::AccessViolation as u16 => ErrorCode::AccessViolation,
+            e if e == ErrorCode::DiskFull as u16 => ErrorCode::DiskFull,
+            e if e == ErrorCode::IllegalOperation as u16 => ErrorCode::IllegalOperation,
+            e if e == ErrorCode::UnknownTid as u16 => ErrorCode::UnknownTid,
+            e if e == ErrorCode::FileAlreadyExists as u16 => ErrorCode::FileAlreadyExists,
+            e if e == ErrorCode::NoSuchUser as u16 => ErrorCode::NoSuchUser,
+            _ => return Err(ErrorKind::InvalidInput.into()),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,5 +131,27 @@ mod tests {
         assert_eq!(Mode::NetAscii, Mode::try_from("NETASCII".to_string()).unwrap());
         assert_eq!(Mode::Octet, Mode::try_from("OCtet".to_string()).unwrap());
         assert!(Mode::try_from("PotAtOO".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_errorcode_conversions() {
+        assert_eq!(u16::from(ErrorCode::NotDefined), 0);
+        assert_eq!(u16::from(ErrorCode::FileNotFound), 1);
+        assert_eq!(u16::from(ErrorCode::AccessViolation), 2);
+        assert_eq!(u16::from(ErrorCode::DiskFull), 3);
+        assert_eq!(u16::from(ErrorCode::IllegalOperation), 4);
+        assert_eq!(u16::from(ErrorCode::UnknownTid), 5);
+        assert_eq!(u16::from(ErrorCode::FileAlreadyExists), 6);
+        assert_eq!(u16::from(ErrorCode::NoSuchUser), 7);
+
+        assert!(ErrorCode::try_from(8).is_err());
+        assert_eq!(ErrorCode::NotDefined, ErrorCode::try_from(0).unwrap());
+        assert_eq!(ErrorCode::FileNotFound, ErrorCode::try_from(1).unwrap());
+        assert_eq!(ErrorCode::AccessViolation, ErrorCode::try_from(2).unwrap());
+        assert_eq!(ErrorCode::DiskFull, ErrorCode::try_from(3).unwrap());
+        assert_eq!(ErrorCode::IllegalOperation, ErrorCode::try_from(4).unwrap());
+        assert_eq!(ErrorCode::UnknownTid, ErrorCode::try_from(5).unwrap());
+        assert_eq!(ErrorCode::FileAlreadyExists, ErrorCode::try_from(6).unwrap());
+        assert_eq!(ErrorCode::NoSuchUser, ErrorCode::try_from(7).unwrap());
     }
 }
