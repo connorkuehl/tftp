@@ -123,11 +123,23 @@ pub struct Packet<T: Debug + Into<Vec<u8>> + TryFrom<Vec<u8>>> {
 
 impl Packet<Rq> {
     pub fn read(filename: String, mode: Mode) -> Packet<Rq> {
-        unimplemented!()
+        let header = Opcode::Rrq;
+        let body = Rq {
+            filename,
+            mode,
+        };
+
+        Packet { header, body }
     }
 
     pub fn write(filename: String, mode: Mode) -> Packet<Rq> {
-        unimplemented!()
+        let header = Opcode::Wrq;
+        let body = Rq {
+            filename,
+            mode,
+        };
+
+        Packet { header, body }
     }
 }
 
