@@ -1,3 +1,6 @@
+use std::convert::TryFrom;
+use std::fmt::Debug;
+
 mod bytes;
 
 /// `Opcode` is an identifier for a TFTP packet. It is always the first
@@ -69,6 +72,7 @@ pub type Block = u16;
 /// `Rq` is a request packet (either read or write) and it identifies the
 /// object/filename that will be uploaded/downloaded as well as the mode it
 /// should be transferred in.
+#[derive(Debug)]
 pub struct Rq {
     /// The filename to operate on.
     pub filename: String,
@@ -79,6 +83,7 @@ pub struct Rq {
 
 /// `Data` is a packet that contains a 2-byte block number and up to 512
 /// bytes of data.
+#[derive(Debug)]
 pub struct Data {
     /// The block identifier for this data.
     pub block: Block,
@@ -89,6 +94,7 @@ pub struct Data {
 
 /// An `Ack` packet acknowledges successful receipt of a `Data` packet
 /// and indicates that the next `Data` packet should be sent.
+#[derive(Debug)]
 pub struct Ack {
     /// The block identifier that is being acknowledged.
     pub block: Block,
@@ -96,12 +102,23 @@ pub struct Ack {
 
 /// An `Error` packet is a courtesy packet that is sent prior to terminating
 /// the TFTP connection due to an unrecoverable error.
+#[derive(Debug)]
 pub struct Error {
     /// An integer code that describes the error.
     pub code: ErrorCode,
 
     /// A human readable description of the error.
     pub message: String,
+}
+
+/// A TFTP packet.
+#[derive(Debug)]
+pub struct Packet<T: Debug + Into<Vec<u8>> + TryFrom<Vec<u8>>> {
+    /// TFTP packet identifier.
+    pub header: Opcode,
+
+    /// The contents of the packet.
+    pub body: T,
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use std::convert::{TryFrom, TryInto};
+use std::fmt::Debug;
 use std::ffi::CString;
 use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
@@ -249,6 +250,49 @@ impl From<Error> for Vec<u8> {
         bytes.append(&mut code.to_le_bytes().to_vec());
         bytes.append(&mut err.message.into_bytes());
         bytes.append(&mut vec![0]);
+        bytes
+    }
+}
+
+impl<T> TryFrom<Vec<u8>> for Packet<T>
+    where T: Debug + Into<Vec<u8>> + TryFrom<Vec<u8>> {
+    type Error = io::Error;
+
+    fn try_from(mut bytes: Vec<u8>) -> Result<Packet<T>> {
+        /* size_of Opcode integer representation */
+        let split_at = size_of::<u16>();
+        assert_eq!(split_at, 2);
+
+        if split_at > bytes.len() {
+            return Err(ErrorKind::InvalidInput.into());
+        }
+
+        let body = bytes.split_off(split_at);
+
+        let mut op: [u8; 2] = Default::default();
+        op.copy_from_slice(&bytes[..]);
+        let op = u16::from_le_bytes(op);
+        let op = u16::from_ne_bytes(op.to_ne_bytes());
+        let op = op.try_into()?;
+
+        /* FIXME */
+        let body = T::try_from(body).map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?;
+
+        Ok(Packet { header: op, body })
+    }
+}
+
+impl<T> From<Packet<T>> for Vec<u8>
+    where T: Debug + Into<Vec<u8>> + TryFrom<Vec<u8>> {
+
+    fn from(packet: Packet<T>) -> Vec<u8> {
+        let code: u16 = packet.header.into();
+        let mut code = code.to_le_bytes().to_vec();
+        let mut body = packet.body.into();
+
+        let mut bytes = vec![];
+        bytes.append(&mut code);
+        bytes.append(&mut body);
         bytes
     }
 }
