@@ -157,7 +157,12 @@ impl Packet<Data> {
 
 impl Packet<Ack> {
     pub fn new(block: Block) -> Packet<Ack> {
-        unimplemented!()
+        let header = Opcode::Ack;
+        let body = Ack {
+            block,
+        };
+
+        Packet { header, body }
     }
 }
 
