@@ -1,6 +1,4 @@
-//! tftp
-
-mod packet;
+mod bytes;
 
 #[cfg(test)]
 mod tests {
