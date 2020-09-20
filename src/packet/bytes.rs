@@ -158,11 +158,11 @@ impl TryFrom<Vec<u8>> for Data {
         block.copy_from_slice(&bytes[..]);
 
         /* FIXME: Should this be Big Endian? */
-        let block = u16::from_le_bytes(block);
-        let block = u16::from_ne_bytes(block.to_ne_bytes());
+        let block = Block::from_le_bytes(block);
+        let block = Block::from_ne_bytes(block.to_ne_bytes());
 
         Ok(Data {
-            block: Block(block),
+            block,
             data,
         })
     }
@@ -172,7 +172,7 @@ impl From<Data> for Vec<u8> {
     fn from(mut data: Data) -> Vec<u8> {
         let mut bytes = vec![];
         /* FIXME: Should this be Big Endian? */
-        bytes.append(&mut data.block.0.to_le_bytes().to_vec());
+        bytes.append(&mut data.block.to_le_bytes().to_vec());
         bytes.append(&mut data.data);
         bytes
     }
@@ -264,14 +264,14 @@ mod tests {
         let bytes = vec![4, 0, 0xce, 0xce, 0xce];
         let data = Data::try_from(bytes).unwrap();
 
-        assert_eq!(data.block, Block(4));
+        assert_eq!(data.block, 4);
         assert_eq!(data.data, vec![0xce, 0xce, 0xce]);
     }
 
     #[test]
     fn test_data_to_bytes() {
         let data = Data {
-            block: Block(112),
+            block: 112,
             data: vec![b'p', b'o', b't', b'a', b't', b'o'],
         };
 

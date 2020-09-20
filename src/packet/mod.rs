@@ -64,9 +64,7 @@ pub enum ErrorCode {
     NoSuchUser = 7,
 }
 
-#[derive(Debug, PartialEq)]
-#[repr(transparent)]
-pub struct Block(u16);
+type Block = u16;
 
 /// `Rq` is a request packet (either read or write) and it identifies the
 /// object/filename that will be uploaded/downloaded as well as the mode it
