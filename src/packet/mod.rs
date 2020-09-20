@@ -64,9 +64,23 @@ pub enum ErrorCode {
     NoSuchUser = 7,
 }
 
+#[derive(Debug, PartialEq)]
+#[repr(transparent)]
+pub struct Block(u16);
+
 pub struct Rq {
     pub filename: String,
     pub mode: Mode,
+}
+
+/// `Data` is a packet that contains a 2-byte block number and up to 512
+/// bytes of data.
+pub struct Data {
+    /// The block identifier for this data.
+    pub block: Block,
+
+    /// The payload.
+    pub data: Vec<u8>,
 }
 
 #[cfg(test)]

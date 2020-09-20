@@ -1,6 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::ffi::CString;
 use std::io::{self, ErrorKind, Result};
+use std::mem::size_of;
 
 use crate::util::FirstNul;
 
@@ -146,6 +147,37 @@ impl From<Rq> for Vec<u8> {
     }
 }
 
+impl TryFrom<Vec<u8>> for Data {
+    type Error = io::Error;
+
+    fn try_from(mut bytes: Vec<u8>) -> Result<Data> {
+        assert_eq!(size_of::<Block>(), 2);
+        let data = bytes.split_off(size_of::<Block>());
+
+        let mut block: [u8; 2] = Default::default();
+        block.copy_from_slice(&bytes[..]);
+
+        /* FIXME: Should this be Big Endian? */
+        let block = u16::from_le_bytes(block);
+        let block = u16::from_ne_bytes(block.to_ne_bytes());
+
+        Ok(Data {
+            block: Block(block),
+            data,
+        })
+    }
+}
+
+impl From<Data> for Vec<u8> {
+    fn from(mut data: Data) -> Vec<u8> {
+        let mut bytes = vec![];
+        /* FIXME: Should this be Big Endian? */
+        bytes.append(&mut data.block.0.to_le_bytes().to_vec());
+        bytes.append(&mut data.data);
+        bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,5 +257,25 @@ mod tests {
 
         let bytes: Vec<u8> = rq.into();
         assert_eq!(bytes, vec![b'b', b'y', b'e', b'.', b't', b'x', b't', b'\0', b'm', b'a', b'i', b'l', b'\0']);
+    }
+
+    #[test]
+    fn test_data_from_bytes() {
+        let bytes = vec![4, 0, 0xce, 0xce, 0xce];
+        let data = Data::try_from(bytes).unwrap();
+
+        assert_eq!(data.block, Block(4));
+        assert_eq!(data.data, vec![0xce, 0xce, 0xce]);
+    }
+
+    #[test]
+    fn test_data_to_bytes() {
+        let data = Data {
+            block: Block(112),
+            data: vec![b'p', b'o', b't', b'a', b't', b'o'],
+        };
+
+        let bytes: Vec<u8> = data.into();
+        assert_eq!(bytes, vec![112, 0, b'p', b'o', b't', b'a', b't', b'o']);
     }
 }
