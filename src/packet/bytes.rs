@@ -151,8 +151,13 @@ impl TryFrom<Vec<u8>> for Data {
     type Error = io::Error;
 
     fn try_from(mut bytes: Vec<u8>) -> Result<Data> {
-        assert_eq!(size_of::<Block>(), 2);
-        let data = bytes.split_off(size_of::<Block>());
+        let split_at = size_of::<Block>();
+        if split_at > bytes.len() {
+            return Err(ErrorKind::InvalidInput.into());
+        }
+
+        assert_eq!(split_at, 2);
+        let data = bytes.split_off(split_at);
 
         let mut block: [u8; 2] = Default::default();
         block.copy_from_slice(&bytes[..]);
@@ -266,6 +271,9 @@ mod tests {
 
         assert_eq!(data.block, 4);
         assert_eq!(data.data, vec![0xce, 0xce, 0xce]);
+
+        let bytes = vec![2, 0];
+        let data = Data::try_from(bytes).unwrap();
     }
 
     #[test]
