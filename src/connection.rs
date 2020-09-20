@@ -69,7 +69,27 @@ impl<T: Read> Connection<Put<T>> {
         }
     }
 
-    pub fn put(self) -> Result<()> {
-        unimplemented!()
+    pub fn put(mut self) -> Result<()> {
+        /*
+         * FIXME: TODO: retransmit timed out packets
+         * FIXME: ensure the ack matches the last packet sent */
+        loop {
+            let mut buf = [0; MAX_PAYLOAD_SIZE];
+            let bytes_read = self.direction.0.read(&mut buf[..])?;
+
+            let data: Packet<Data> = Packet::try_from(buf.to_vec())?;
+            let bytes: Vec<u8> = data.into();
+            let _ = self.socket.send(&bytes[..])?;
+
+            let mut buf = [0; MAX_PACKET_SIZE];
+            let _ = self.socket.recv(&mut buf[..])?;
+            let _: Packet<Ack> = Packet::try_from(buf.to_vec())?;
+
+            if bytes_read < MAX_PAYLOAD_SIZE {
+                break;
+            }
+        }
+
+        Ok(())
     }
 }
