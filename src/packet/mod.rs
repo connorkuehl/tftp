@@ -121,6 +121,34 @@ pub struct Packet<T: Debug + Into<Vec<u8>> + TryFrom<Vec<u8>>> {
     pub body: T,
 }
 
+impl Packet<Rq> {
+    pub fn read(filename: String, mode: Mode) -> Packet<Rq> {
+        unimplemented!()
+    }
+
+    pub fn write(filename: String, mode: Mode) -> Packet<Rq> {
+        unimplemented!()
+    }
+}
+
+impl Packet<Data> {
+    pub fn new(block: Block, data: Vec<u8>) -> Packet<Data> {
+        unimplemented!()
+    }
+}
+
+impl Packet<Ack> {
+    pub fn new(block: Block) -> Packet<Ack> {
+        unimplemented!()
+    }
+}
+
+impl Packet<Error> {
+    pub fn new(code: ErrorCode) -> Packet<Error> {
+        unimplemented!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 }
