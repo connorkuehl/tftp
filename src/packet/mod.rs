@@ -68,8 +68,14 @@ pub enum ErrorCode {
 #[repr(transparent)]
 pub struct Block(u16);
 
+/// `Rq` is a request packet (either read or write) and it identifies the
+/// object/filename that will be uploaded/downloaded as well as the mode it
+/// should be transferred in.
 pub struct Rq {
+    /// The filename to operate on.
     pub filename: String,
+
+    /// The mode for the TFTP transmission.
     pub mode: Mode,
 }
 
