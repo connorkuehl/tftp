@@ -94,6 +94,16 @@ pub struct Ack {
     pub block: Block,
 }
 
+/// An `Error` packet is a courtesy packet that is sent prior to terminating
+/// the TFTP connection due to an unrecoverable error.
+pub struct Error {
+    /// An integer code that describes the error.
+    pub code: ErrorCode,
+
+    /// A human readable description of the error.
+    pub message: String,
+}
+
 #[cfg(test)]
 mod tests {
 }

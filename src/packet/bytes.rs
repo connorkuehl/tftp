@@ -211,6 +211,47 @@ impl From<Ack> for Vec<u8> {
     }
 }
 
+impl TryFrom<Vec<u8>> for Error {
+    type Error = io::Error;
+
+    fn try_from(mut bytes: Vec<u8>) -> Result<Error> {
+        /* size_of underlying ErrorCode integer representation */
+        let split_at = size_of::<u16>();
+        assert_eq!(split_at, 2);
+
+        if split_at > bytes.len() {
+            return Err(ErrorKind::InvalidInput.into());
+        }
+
+        let mut message = bytes.split_off(split_at);
+        /* pop off the NUL byte */
+        let _ = message.pop();
+        let message = CString::new(message)
+            .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?
+            .into_string()
+            .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?;
+
+        let mut error_code: [u8; 2] = Default::default();
+        error_code.copy_from_slice(&bytes[..]);
+        let error_code = u16::from_le_bytes(error_code);
+        let error_code = u16::from_ne_bytes(error_code.to_ne_bytes());
+        let code = error_code.try_into()?;
+
+        Ok(Error { code, message })
+    }
+}
+
+impl From<Error> for Vec<u8> {
+    fn from(err: Error) -> Vec<u8> {
+        let code: u16 = err.code.into();
+        let mut bytes = vec![];
+        bytes.append(&mut code.to_le_bytes().to_vec());
+        bytes.append(&mut err.message.into_bytes());
+        bytes.append(&mut vec![0]);
+        bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,5 +368,23 @@ mod tests {
         let ack = Ack { block: 12 };
         let bytes: Vec<u8> = ack.into();
         assert_eq!(bytes, vec![12, 0]);
+    }
+
+    #[test]
+    fn test_error_from_bytes() {
+        let bytes = vec![1, 0, b'm', b's', b'g', b'\0'];
+        let err = Error::try_from(bytes).unwrap();
+        assert_eq!(err.code, ErrorCode::FileNotFound.into());
+    }
+
+    #[test]
+    fn test_error_to_bytes() {
+        let err = Error {
+            code: ErrorCode::AccessViolation,
+            message: "msg".to_string(),
+        };
+
+        let bytes: Vec<u8> = err.into();
+        assert_eq!(bytes, vec![2, 0, b'm', b's', b'g', b'\0']);
     }
 }
