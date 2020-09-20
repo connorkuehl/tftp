@@ -87,6 +87,13 @@ pub struct Data {
     pub data: Vec<u8>,
 }
 
+/// An `Ack` packet acknowledges successful receipt of a `Data` packet
+/// and indicates that the next `Data` packet should be sent.
+pub struct Ack {
+    /// The block identifier that is being acknowledged.
+    pub block: Block,
+}
+
 #[cfg(test)]
 mod tests {
 }

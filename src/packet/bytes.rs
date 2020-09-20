@@ -183,6 +183,34 @@ impl From<Data> for Vec<u8> {
     }
 }
 
+impl TryFrom<Vec<u8>> for Ack {
+    type Error = io::Error;
+
+    fn try_from(mut bytes: Vec<u8>) -> Result<Ack> {
+        let split_at = size_of::<Block>();
+        if split_at > bytes.len() {
+            return Err(ErrorKind::InvalidInput.into());
+        }
+
+        assert_eq!(split_at, 2);
+        let data = bytes.split_off(split_at);
+
+        let mut block: [u8; 2] = Default::default();
+        block.copy_from_slice(&bytes[..]);
+
+        let block = Block::from_le_bytes(block);
+        let block = Block::from_ne_bytes(block.to_ne_bytes());
+
+        Ok(Ack { block })
+    }
+}
+
+impl From<Ack> for Vec<u8> {
+    fn from(ack: Ack) -> Vec<u8> {
+        ack.block.to_le_bytes().to_vec()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,5 +313,19 @@ mod tests {
 
         let bytes: Vec<u8> = data.into();
         assert_eq!(bytes, vec![112, 0, b'p', b'o', b't', b'a', b't', b'o']);
+    }
+
+    #[test]
+    fn test_ack_from_bytes() {
+        let bytes = vec![12, 0];
+        let ack = Ack::try_from(bytes).unwrap();
+        assert_eq!(ack.block, 12);
+    }
+
+    #[test]
+    fn test_ack_to_bytes() {
+        let ack = Ack { block: 12 };
+        let bytes: Vec<u8> = ack.into();
+        assert_eq!(bytes, vec![12, 0]);
     }
 }
