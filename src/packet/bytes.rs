@@ -301,7 +301,7 @@ mod tests {
         assert_eq!(data.data, vec![0xce, 0xce, 0xce]);
 
         let bytes = vec![2, 0];
-        let data = Data::try_from(bytes).unwrap();
+        let _ = Data::try_from(bytes).unwrap();
     }
 
     #[test]
