@@ -145,7 +145,13 @@ impl Packet<Rq> {
 
 impl Packet<Data> {
     pub fn new(block: Block, data: Vec<u8>) -> Packet<Data> {
-        unimplemented!()
+        let header = Opcode::Data;
+        let body = Data {
+            block,
+            data,
+        };
+
+        Packet { header, body }
     }
 }
 
