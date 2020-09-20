@@ -5,7 +5,7 @@ mod bytes;
 
 /// `Opcode` is an identifier for a TFTP packet. It is always the first
 /// two bytes of a TFTP header.
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Opcode {
     /// Read request
     Rrq = 1,
@@ -40,7 +40,7 @@ pub enum Mode {
 
 /// `ErrorCode` represents the error conditions that can be reached during
 /// a regular TFTP operation.
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ErrorCode {
     /// Not defined, see error message (if any).
     NotDefined = 0,
@@ -65,6 +65,21 @@ pub enum ErrorCode {
 
     /// No such user.
     NoSuchUser = 7,
+}
+
+impl From<ErrorCode> for String {
+    fn from(code: ErrorCode) -> String {
+        match code {
+            ErrorCode::NotDefined => "Not defined".to_string(),
+            ErrorCode::FileNotFound => "File not found".to_string(),
+            ErrorCode::AccessViolation => "Access violation".to_string(),
+            ErrorCode::DiskFull => "Disk full or allocation exceeded".to_string(),
+            ErrorCode::IllegalOperation => "Illegal TFTP operation".to_string(),
+            ErrorCode::UnknownTid => "Unknown transfer ID".to_string(),
+            ErrorCode::FileAlreadyExists => "File already exists".to_string(),
+            ErrorCode::NoSuchUser => "No such user".to_string(),
+        }
+    }
 }
 
 pub type Block = u16;
@@ -168,7 +183,23 @@ impl Packet<Ack> {
 
 impl Packet<Error> {
     pub fn new(code: ErrorCode) -> Packet<Error> {
-        unimplemented!()
+        let header = Opcode::Error;
+        let body = Error {
+            code,
+            message: code.into(),
+        };
+
+        Packet { header, body }
+    }
+
+    pub fn with_custom_message(code: ErrorCode, message: String) -> Packet<Error> {
+        let header = Opcode::Error;
+        let body = Error {
+            code,
+            message,
+        };
+
+        Packet { header, body }
     }
 }
 
