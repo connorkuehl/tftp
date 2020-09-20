@@ -1,6 +1,8 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::ffi::CString;
 use std::io::{self, ErrorKind, Result};
+
+use crate::util::FirstNul;
 
 use super::*;
 
@@ -94,6 +96,56 @@ impl TryFrom<u16> for ErrorCode {
     }
 }
 
+impl TryFrom<Vec<u8>> for Rq {
+    type Error = io::Error;
+
+    fn try_from(mut bytes: Vec<u8>) -> Result<Rq> {
+        let nul = match bytes.find_first_nul() {
+            Some(n) => n,
+            None => return Err(ErrorKind::InvalidInput.into()),
+        };
+
+        /* splitting off 1-byte past the NUL byte because we don't want
+         * to include the NUL byte in the returned Vec */
+        let split_at = nul + 1;
+
+        /* split_off panics if at > len */
+        if split_at > bytes.len() {
+            return Err(ErrorKind::InvalidInput.into());
+        }
+
+        let mut mode = bytes.split_off(nul + 1);
+
+        /* drop the nul terminators, these will be added by CString::new
+         * and CString::new fails when they are already present. */
+        let _ = mode.pop();
+        let _ = bytes.pop();
+
+        let mode = CString::new(mode)
+            .map(|c| -> std::result::Result<Mode, Box<dyn std::error::Error>> { c.try_into() })?
+            .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?;
+        let filename = CString::new(bytes)
+            .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?
+            .into_string()
+            .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?;
+
+        Ok(Rq { filename, mode })
+    }
+}
+
+impl From<Rq> for Vec<u8> {
+    fn from(rq: Rq) -> Vec<u8> {
+        let mode: String = rq.mode.into();
+
+        let mut bytes = vec![];
+        bytes.append(&mut rq.filename.into_bytes());
+        bytes.append(&mut vec![0]);
+        bytes.append(&mut mode.into_bytes());
+        bytes.append(&mut vec![0]);
+        bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +205,25 @@ mod tests {
         assert_eq!(ErrorCode::UnknownTid, ErrorCode::try_from(5).unwrap());
         assert_eq!(ErrorCode::FileAlreadyExists, ErrorCode::try_from(6).unwrap());
         assert_eq!(ErrorCode::NoSuchUser, ErrorCode::try_from(7).unwrap());
+    }
+
+    #[test]
+    fn test_rq_from_bytes() {
+        let bytes = vec![b'h', b'i', b'.', b't', b'x', b't', b'\0', b'n', b'e', b't', b'a', b's', b'c', b'i', b'i', b'\0'];
+        let rq = Rq::try_from(bytes).unwrap();
+
+        assert_eq!(rq.filename, "hi.txt".to_string());
+        assert_eq!(rq.mode, Mode::NetAscii);
+    }
+
+    #[test]
+    fn test_rq_to_bytes() {
+        let rq = Rq {
+            filename: "bye.txt".to_string(),
+            mode: Mode::Mail,
+        };
+
+        let bytes: Vec<u8> = rq.into();
+        assert_eq!(bytes, vec![b'b', b'y', b'e', b'.', b't', b'x', b't', b'\0', b'm', b'a', b'i', b'l', b'\0']);
     }
 }

@@ -64,6 +64,11 @@ pub enum ErrorCode {
     NoSuchUser = 7,
 }
 
+pub struct Rq {
+    pub filename: String,
+    pub mode: Mode,
+}
+
 #[cfg(test)]
 mod tests {
 }
