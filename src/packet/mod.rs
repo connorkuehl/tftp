@@ -22,5 +22,4 @@ pub enum Opcode {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 }
