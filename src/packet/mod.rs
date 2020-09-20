@@ -20,6 +20,21 @@ pub enum Opcode {
     Error = 5,
 }
 
+/// `Mode` represents a desired transmission mode for a TFTP transfer. It
+/// is used in request packets.
+#[derive(Debug, PartialEq)]
+pub enum Mode {
+    /// Mail is obsolete and RFC 1350 states it should not be implemented
+    /// or used.
+    Mail,
+
+    /// NetAscii is just 7-bit ASCII.
+    NetAscii,
+
+    /// Octet, or binary transmission.
+    Octet,
+}
+
 #[cfg(test)]
 mod tests {
 }
