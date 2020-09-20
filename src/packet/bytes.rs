@@ -44,16 +44,6 @@ impl TryFrom<String> for Mode {
     }
 }
 
-impl From<Mode> for String {
-    fn from(mode: Mode) -> String {
-        match mode {
-            Mode::Mail => "mail".to_string(),
-            Mode::NetAscii => "netascii".to_string(),
-            Mode::Octet => "octet".to_string(),
-        }
-    }
-}
-
 impl TryFrom<CString> for Mode {
     type Error = io::Error;
 

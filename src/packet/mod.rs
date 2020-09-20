@@ -38,6 +38,16 @@ pub enum Mode {
     Octet,
 }
 
+impl From<Mode> for String {
+    fn from(mode: Mode) -> String {
+        match mode {
+            Mode::Mail => "mail".to_string(),
+            Mode::NetAscii => "netascii".to_string(),
+            Mode::Octet => "octet".to_string(),
+        }
+    }
+}
+
 /// `ErrorCode` represents the error conditions that can be reached during
 /// a regular TFTP operation.
 #[derive(Copy, Clone, Debug, PartialEq)]
