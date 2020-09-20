@@ -193,7 +193,7 @@ impl TryFrom<Vec<u8>> for Ack {
         }
 
         assert_eq!(split_at, 2);
-        let data = bytes.split_off(split_at);
+        let _ = bytes.split_off(split_at);
 
         let mut block: [u8; 2] = Default::default();
         block.copy_from_slice(&bytes[..]);
