@@ -44,7 +44,7 @@ impl<T: Write> Connection<Get<T>> {
              *
              * 2) this should be improved to make it easier to read an error
              * packet too. */
-            let data: Packet<Data> = Packet::try_from(buf.to_vec())?;
+            let data: Packet<Data> = Packet::try_from((&buf[..bytes_read]).to_vec())?;
             self.direction.0.write_all(&data.body.data[..])?;
             last_block += 1;
 
@@ -75,17 +75,17 @@ impl<T: Read> Connection<Put<T>> {
          * FIXME: ensure the ack matches the last packet sent */
         loop {
             let mut buf = [0; MAX_PAYLOAD_SIZE];
-            let bytes_read = self.direction.0.read(&mut buf[..])?;
+            let canonical_bytes = self.direction.0.read(&mut buf[..])?;
 
             let data: Packet<Data> = Packet::try_from(buf.to_vec())?;
             let bytes: Vec<u8> = data.into();
             let _ = self.socket.send(&bytes[..])?;
 
             let mut buf = [0; MAX_PACKET_SIZE];
-            let _ = self.socket.recv(&mut buf[..])?;
-            let _: Packet<Ack> = Packet::try_from(buf.to_vec())?;
+            let bytes_read = self.socket.recv(&mut buf[..])?;
+            let _: Packet<Ack> = Packet::try_from((&buf[..bytes_read]).to_vec())?;
 
-            if bytes_read < MAX_PAYLOAD_SIZE {
+            if canonical_bytes < MAX_PAYLOAD_SIZE {
                 break;
             }
         }
