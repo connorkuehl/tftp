@@ -54,12 +54,13 @@ impl From<Mode> for String {
 }
 
 impl TryFrom<CString> for Mode {
-    type Error = Box<dyn std::error::Error>;
+    type Error = io::Error;
 
     fn try_from(s: CString) -> std::result::Result<Mode, Self::Error> {
-        let s = String::from_utf8(s.into_bytes())?;
+        let s = String::from_utf8(s.into_bytes())
+            .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?;
 
-        Mode::try_from(s).map_err(|e| -> Box<dyn std::error::Error> { Box::new(e) })
+        Mode::try_from(s)
     }
 }
 
@@ -123,7 +124,7 @@ impl TryFrom<Vec<u8>> for Rq {
         let _ = bytes.pop();
 
         let mode = CString::new(mode)
-            .map(|c| -> std::result::Result<Mode, Box<dyn std::error::Error>> { c.try_into() })?
+            .map(|c| c.try_into())?
             .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?;
         let filename = CString::new(bytes)
             .map_err(|_| -> io::Error { ErrorKind::InvalidInput.into() })?
