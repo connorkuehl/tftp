@@ -42,7 +42,7 @@ impl Server {
 
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(1001, u16::MAX);
-        let bind_to = format!("127.0.0.1:{}", port);
+        let bind_to = format!("0.0.0.0:{}", port);
 
         Handler::new(bind_to, src_addr, direction)
     }
