@@ -72,6 +72,10 @@ impl Connection {
 
             assert_eq!(Block::new(current_block), ack.body.block);
             current_block += 1;
+
+            if bytes_read < MAX_PAYLOAD_SIZE {
+                break;
+            }
         }
 
         Ok(())
