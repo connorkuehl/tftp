@@ -17,7 +17,7 @@ impl Connection {
         Self { socket }
     }
 
-    pub fn get<W: Write>(&self, mut writer: W) -> Result<W> {
+    pub fn get<W: Write>(self, mut writer: W) -> Result<W> {
         let mut blocks_recvd = 1;
 
         loop {
@@ -47,7 +47,7 @@ impl Connection {
         Ok(writer)
     }
 
-    pub fn put<R: Read>(&self, mut reader: R) -> Result<()> {
+    pub fn put<R: Read>(self, mut reader: R) -> Result<()> {
         let mut current_block = 1;
 
         loop {
