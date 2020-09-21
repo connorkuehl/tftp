@@ -9,7 +9,8 @@ use super::Rq;
 pub struct Rrq(Rq);
 
 impl Rrq {
-    pub fn new(filename: String, mode: Mode) -> Self {
+    pub fn new<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
+        let filename = filename.as_ref().to_string();
         Self(Rq { filename, mode })
     }
 }

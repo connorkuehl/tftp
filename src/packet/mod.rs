@@ -62,7 +62,7 @@ impl<T: sealed::Packet> Packet<T> {
 }
 
 impl Packet<Rrq> {
-    pub fn rrq(filename: String, mode: Mode) -> Self {
+    pub fn rrq<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let rrq = Rrq::new(filename, mode);
 
         Self::new(rrq)
@@ -70,7 +70,7 @@ impl Packet<Rrq> {
 }
 
 impl Packet<Wrq> {
-    pub fn wrq(filename: String, mode: Mode) -> Self {
+    pub fn wrq<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let wrq = Wrq::new(filename, mode);
 
         Self::new(wrq)
