@@ -47,6 +47,7 @@ impl IntoBytes for Block {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Packet<T: sealed::Packet> {
     header: Opcode,
     body: T,
@@ -145,6 +146,10 @@ mod tests {
         bytes.append(&mut filename);
         bytes.append(&mut mode);
         assert_eq!(bytes, rrq.into_bytes());
+
+        let expected = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+        let actual = Packet::<Rrq>::from_bytes(&bytes[..]).unwrap();
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -159,6 +164,10 @@ mod tests {
         bytes.append(&mut filename);
         bytes.append(&mut mode);
         assert_eq!(bytes, wrq.into_bytes());
+
+        let expected = Packet::wrq("alice-in-wonderland.txt", Mode::Mail);
+        let actual = Packet::<Wrq>::from_bytes(&bytes[..]).unwrap();
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -173,18 +182,26 @@ mod tests {
         bytes.append(&mut block);
         bytes.append(&mut dat);
         assert_eq!(bytes, data.into_bytes());
+
+        let expected = Packet::data(Block(25), &[1, 2, 3]);
+        let actual = Packet::<Data>::from_bytes(&bytes[..]).unwrap();
+        assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_ack() {
-        let ack = Packet::ack(Block(2));
+        let ack = Packet::ack(Block(1));
         assert_eq!(ack.header, Opcode::Ack);
 
         let op = vec![0, 4];
-        let mut block = vec![0, 2];
+        let mut block = vec![0, 1];
         let mut bytes = op;
         bytes.append(&mut block);
         assert_eq!(bytes, ack.into_bytes());
+
+        let expected = Packet::ack(Block(1));
+        let actual = Packet::<Ack>::from_bytes(&bytes[..]).unwrap();
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -199,5 +216,9 @@ mod tests {
         bytes.append(&mut code);
         bytes.append(&mut message);
         assert_eq!(bytes, error.into_bytes());
+
+        let expected = Packet::error(Code::FileNotFound, "file not found");
+        let actual = Packet::<Error>::from_bytes(&bytes[..]).unwrap();
+        assert_eq!(expected, actual);
     }
 }

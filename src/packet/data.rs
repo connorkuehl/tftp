@@ -6,6 +6,7 @@ use crate::packet::sealed::Packet;
 use crate::packet::opcode::Opcode;
 use super::Block;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Data {
     pub block: Block,
     pub data: Vec<u8>,

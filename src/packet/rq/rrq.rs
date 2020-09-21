@@ -6,6 +6,7 @@ use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 use super::Rq;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Rrq(Rq);
 
 impl Rrq {
