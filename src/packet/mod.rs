@@ -18,7 +18,7 @@ mod opcode;
 mod rq;
 
 pub const MAX_PAYLOAD_SIZE: usize = 512;
-pub const MAX_PACKET_SIZE: usize = MAX_PAYLOAD_SIZE + 2;
+pub const MAX_PACKET_SIZE: usize = 516;
 
 mod sealed {
     use crate::bytes::{FromBytes, IntoBytes};
