@@ -4,7 +4,7 @@ use std::io::{self, ErrorKind, Result};
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Opcode {
     Rrq = 1,
     Wrq = 2,
