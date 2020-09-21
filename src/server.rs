@@ -90,6 +90,8 @@ impl Handler {
         if let Direction::Put(wrq) = self.direction {
             let f = OpenOptions::new()
                 .write(true)
+                .create(true)
+                /* FIXME: Not sure why this hangs if create is not specified */
                 .truncate(true)
                 .open(wrq.body.0.filename)?;
             let ack = Packet::ack(Block::new(0));
