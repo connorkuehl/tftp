@@ -38,3 +38,28 @@ impl IntoBytes for Ack {
         self.block.into_bytes()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_bytes() {
+        let input = &[0, 1];
+        let actual = Ack::from_bytes(&input[..]).unwrap();
+
+        assert_eq!(actual.block.0, 1);
+        assert!(Ack::from_bytes(&[1]).is_err());
+        assert!(Ack::from_bytes(&[1, 2, 3]).is_err());
+    }
+
+    #[test]
+    fn test_into_bytes() {
+        let ack = Ack {
+            block: Block(23),
+        };
+
+        let bytes = ack.into_bytes();
+        assert_eq!(&bytes[..], &[0, 23]);
+    }
+}
