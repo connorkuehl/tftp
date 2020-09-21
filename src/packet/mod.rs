@@ -32,6 +32,12 @@ mod sealed {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Block(u16);
 
+impl Block {
+    pub fn new(val: u16) -> Self {
+        Self(val)
+    }
+}
+
 impl FromBytes for Block {
     type Error = io::Error;
 
