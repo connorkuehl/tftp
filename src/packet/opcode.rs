@@ -2,7 +2,7 @@ use std::convert::AsRef;
 use std::fmt;
 use std::io::{self, ErrorKind, Result};
 
-use crate::bytes::{FromBytes, IntoBytes};
+use crate::bytes::{Bytes, FromBytes, IntoBytes};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
@@ -38,18 +38,8 @@ impl FromBytes for Opcode {
     type Error = io::Error;
 
     fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self> {
-        let bytes = bytes.as_ref();
-
-        if bytes.len() > 2 {
-            return Err(ErrorKind::InvalidInput.into());
-        }
-
-        let mut bs = [0u8; 2];
-        bs.copy_from_slice(&bytes[..]);
-        let be = u16::from_be_bytes(bs);
-
-        let op = Opcode::from_u16(be)?;
-
+        let bytes = Bytes::from_bytes(bytes)?;
+        let op = Opcode::from_u16(bytes.into_inner())?;
         Ok(op)
     }
 }
