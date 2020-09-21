@@ -58,8 +58,8 @@ impl IntoBytes for Block {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Packet<T: sealed::Packet> {
-    header: Opcode,
-    body: T,
+    pub header: Opcode,
+    pub body: T,
 }
 
 impl<T: sealed::Packet> Packet<T> {
