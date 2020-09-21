@@ -20,6 +20,7 @@ impl Server {
         Ok(Self(socket))
     }
 
+    /* TODO: Maybe return option instead? */
     pub fn serve(&self) -> Result<Handler> {
         let mut buf = [0; MAX_PACKET_SIZE];
         let (nbytes, src_addr) = self.0.recv_from(&mut buf)?;
