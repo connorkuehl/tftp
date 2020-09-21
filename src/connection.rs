@@ -32,7 +32,7 @@ impl Connection {
             let _ = writer.write(&data.body.data[..])?;
 
             let ack = Packet::ack(data.body.block);
-            let _ = self.socket.send(&mut ack.into_bytes()[..])?;
+            let _ = self.socket.send(&ack.into_bytes()[..])?;
 
             if data.body.data.len() < MAX_PAYLOAD_SIZE {
                 break;
@@ -51,7 +51,7 @@ impl Connection {
             let bytes_read = reader.read(&mut buf)?;
             let data = Packet::data(Block::new(current_block), buf[..bytes_read].to_vec());
 
-            let _ = self.socket.send(&mut data.into_bytes()[..])?;
+            let _ = self.socket.send(&data.into_bytes()[..])?;
 
             let mut buf = [0; MAX_PACKET_SIZE];
             let bytes_recvd = self.socket.recv(&mut buf)?;

@@ -112,7 +112,7 @@ impl Handler {
                 }
             };
             let ack = Packet::ack(Block::new(0));
-            let _ = self.socket.send(&mut ack.into_bytes()[..])?;
+            let _ = self.socket.send(&ack.into_bytes()[..])?;
 
             let conn = Connection::new(self.socket);
             conn.get(f)?;
