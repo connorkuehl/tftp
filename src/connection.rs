@@ -5,6 +5,9 @@ use std::net::UdpSocket;
 use crate::bytes::{FromBytes, IntoBytes};
 use crate::packet::*;
 
+/*
+ * TODO: Probably add support for timeouts and retransmissions */
+
 pub struct Connection {
     socket: UdpSocket,
 }
