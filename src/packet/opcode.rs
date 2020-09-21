@@ -29,8 +29,8 @@ impl Opcode {
 impl IntoBytes for Opcode {
     fn into_bytes(self) -> Vec<u8> {
         let val = self as u16;
-        let bytes = val.to_be_bytes();
-        bytes.to_vec()
+        let bytes = Bytes::new(val);
+        bytes.into_bytes()
     }
 }
 
