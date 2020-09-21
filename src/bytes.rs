@@ -1,4 +1,5 @@
 use std::convert::AsRef;
+use std::ffi::{CStr, CString};
 use std::io::{self, ErrorKind};
 use std::mem::size_of;
 
@@ -14,12 +15,12 @@ pub trait IntoBytes {
 
 pub struct Bytes<T>(T);
 
-impl Bytes<u16> {
-    pub fn new(val: u16) -> Self {
+impl<T> Bytes<T> {
+    pub fn new(val: T) -> Self {
         Self(val)
     }
 
-    pub fn into_inner(self) -> u16 {
+    pub fn into_inner(self) -> T {
         self.0
     }
 }
@@ -46,5 +47,26 @@ impl IntoBytes for Bytes<u16> {
     fn into_bytes(self) -> Vec<u8> {
         let bytes = self.0.to_be_bytes();
         bytes.to_vec()
+    }
+}
+
+impl FromBytes for Bytes<String> {
+    type Error = io::Error;
+
+    fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> io::Result<Self> {
+        let bytes = bytes.as_ref();
+        let cstr = CStr::from_bytes_with_nul(bytes)
+            .map_err(|e| io::Error::new(ErrorKind::InvalidInput, e))?;
+        let s = cstr.to_str()
+            .map_err(|e| io::Error::new(ErrorKind::InvalidInput, e))?;
+
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl IntoBytes for Bytes<String> {
+    fn into_bytes(self) -> Vec<u8> {
+        let c = CString::new(self.0).unwrap();
+        c.into_bytes_with_nul()
     }
 }

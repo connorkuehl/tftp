@@ -1,9 +1,8 @@
-use std::ffi::{CStr, CString};
 use std::fmt;
 use std::io::{self, ErrorKind, Result};
 use std::str::FromStr;
 
-use crate::bytes::{FromBytes, IntoBytes};
+use crate::bytes::{Bytes, FromBytes, IntoBytes};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
@@ -26,8 +25,8 @@ impl Mode {
 
 impl IntoBytes for Mode {
     fn into_bytes(self) -> Vec<u8> {
-        let c = CString::new(self.into_string()).unwrap();
-        c.into_bytes_with_nul()
+        let bytes = Bytes::new(self.into_string());
+        bytes.into_bytes()
     }
 }
 
@@ -36,12 +35,10 @@ impl FromBytes for Mode {
 
     fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self> {
         let bytes = bytes.as_ref();
-        let cstr = CStr::from_bytes_with_nul(bytes)
-            .map_err(|e| io::Error::new(ErrorKind::InvalidInput, e))?;
-        let s = cstr.to_str()
-            .map_err(|e| io::Error::new(ErrorKind::InvalidInput, e))?;
+        let s = Bytes::from_bytes(bytes)?;
+        let s: String = s.into_inner();
 
-        Mode::from_str(s)
+        Mode::from_str(&s)
     }
 }
 
