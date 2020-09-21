@@ -36,7 +36,7 @@ impl Connection {
             let _ = writer.write(&data.body.data[..])?;
 
             blocks_recvd += 1;
-            let ack = Packet::ack(Block::new(blocks_recvd));
+            let ack = Packet::ack(data.body.block);
             let _ = self.socket.send(&mut ack.into_bytes()[..])?;
 
             if data.body.data.len() < MAX_PAYLOAD_SIZE {
