@@ -32,6 +32,7 @@
 //!
 //!
 //! Title: Alice’s Adventures in Wonderland
+//! [..]
 //! ```
 //!
 //! Alternatively, you may connect to your server from another host.
