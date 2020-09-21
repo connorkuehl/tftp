@@ -11,8 +11,8 @@ pub use wrq::Wrq;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Rq {
-    filename: String,
-    mode: Mode,
+    pub filename: String,
+    pub mode: Mode,
 }
 
 impl FromBytes for Rq {

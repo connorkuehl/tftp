@@ -7,7 +7,7 @@ use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Rrq(Rq);
+pub struct Rrq(pub Rq);
 
 impl Rrq {
     pub fn new<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
