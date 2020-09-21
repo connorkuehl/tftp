@@ -1,10 +1,10 @@
 use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
-use crate::bytes::{FromBytes, IntoBytes};
-use crate::packet::sealed::Packet;
-use crate::packet::opcode::Opcode;
 use super::Block;
+use crate::bytes::{FromBytes, IntoBytes};
+use crate::packet::opcode::Opcode;
+use crate::packet::sealed::Packet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Data {

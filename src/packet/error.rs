@@ -4,8 +4,8 @@ use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
-use crate::packet::sealed::Packet;
 use crate::packet::opcode::Opcode;
+use crate::packet::sealed::Packet;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Code {
@@ -154,6 +154,12 @@ mod tests {
         };
 
         let bytes = error.into_bytes();
-        assert_eq!(&bytes[..], &[0, 2, b'A', b'c', b'c', b'e', b's', b's', b' ', b'v', b'i', b'o', b'l', b'a', b't', b'i', b'o', b'n', b'\0']);
+        assert_eq!(
+            &bytes[..],
+            &[
+                0, 2, b'A', b'c', b'c', b'e', b's', b's', b' ', b'v', b'i', b'o', b'l', b'a', b't',
+                b'i', b'o', b'n', b'\0'
+            ]
+        );
     }
 }

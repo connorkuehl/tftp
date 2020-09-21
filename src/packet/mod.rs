@@ -6,9 +6,9 @@ use crate::bytes::{Bytes, FromBytes, IntoBytes};
 pub use ack::Ack;
 pub use data::Data;
 pub use error::{Code, Error};
-pub use rq::{Rrq, Wrq};
 pub use mode::Mode;
 pub use opcode::Opcode;
+pub use rq::{Rrq, Wrq};
 
 mod ack;
 mod data;
@@ -114,10 +114,13 @@ impl<T: sealed::Packet> FromBytes for Packet<T> {
         }
 
         /* FIXME: Remove map_err and just use `?` */
-        let body = T::from_bytes(body)
-            .map_err(|_| -> io::Error { ErrorKind::InvalidData.into() })?;
+        let body =
+            T::from_bytes(body).map_err(|_| -> io::Error { ErrorKind::InvalidData.into() })?;
 
-        Ok(Self { header: opcode, body })
+        Ok(Self {
+            header: opcode,
+            body,
+        })
     }
 }
 

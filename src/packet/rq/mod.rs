@@ -1,7 +1,7 @@
 use std::io::{self, ErrorKind, Result};
 
-use crate::bytes::{Bytes, FromBytes, IntoBytes, FirstNul};
 use super::mode::Mode;
+use crate::bytes::{Bytes, FirstNul, FromBytes, IntoBytes};
 
 mod rrq;
 mod wrq;

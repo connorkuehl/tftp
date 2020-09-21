@@ -1,10 +1,10 @@
 use std::io::{self, Result};
 
+use super::Rq;
 use crate::bytes::{FromBytes, IntoBytes};
 use crate::packet::mode::Mode;
 use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
-use super::Rq;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Wrq(Rq);

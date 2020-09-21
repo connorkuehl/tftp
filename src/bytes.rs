@@ -57,7 +57,8 @@ impl FromBytes for Bytes<String> {
         let bytes = bytes.as_ref();
         let cstr = CStr::from_bytes_with_nul(bytes)
             .map_err(|e| io::Error::new(ErrorKind::InvalidInput, e))?;
-        let s = cstr.to_str()
+        let s = cstr
+            .to_str()
             .map_err(|e| io::Error::new(ErrorKind::InvalidInput, e))?;
 
         Ok(Self(s.to_string()))

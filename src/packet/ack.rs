@@ -1,10 +1,10 @@
 use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
-use crate::bytes::{FromBytes, IntoBytes};
-use crate::packet::sealed::Packet;
-use crate::packet::opcode::Opcode;
 use super::Block;
+use crate::bytes::{FromBytes, IntoBytes};
+use crate::packet::opcode::Opcode;
+use crate::packet::sealed::Packet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ack {
@@ -62,9 +62,7 @@ mod tests {
 
     #[test]
     fn test_into_bytes() {
-        let ack = Ack {
-            block: Block(23),
-        };
+        let ack = Ack { block: Block(23) };
 
         let bytes = ack.into_bytes();
         assert_eq!(&bytes[..], &[0, 23]);
