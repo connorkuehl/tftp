@@ -70,3 +70,35 @@ impl IntoBytes for Bytes<String> {
         c.into_bytes_with_nul()
     }
 }
+
+pub trait FirstNul {
+    fn first_nul_idx(&self) -> Option<usize>;
+}
+
+impl<T: AsRef<[u8]>> FirstNul for T {
+    fn first_nul_idx(&self) -> Option<usize> {
+        let bytes = self.as_ref();
+
+        for (idx, byte) in bytes.iter().enumerate() {
+            if *byte == b'\0' {
+                return Some(idx);
+            }
+        }
+
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_first_nul_idx() {
+        let input = b"hello\0world\0";
+        assert_eq!(Some(5), input.first_nul_idx());
+
+        let input = b"no nul byte here!";
+        assert_eq!(None, input.first_nul_idx());
+    }
+}
