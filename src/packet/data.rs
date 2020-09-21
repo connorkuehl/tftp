@@ -1,4 +1,4 @@
-use std::io::{self, Result};
+use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
 use crate::bytes::{FromBytes, IntoBytes};
@@ -20,6 +20,12 @@ impl FromBytes for Data {
 
     fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self> {
         let bytes = bytes.as_ref();
+
+        let split_at = size_of::<Block>();
+        if split_at > bytes.len() {
+            return Err(ErrorKind::InvalidInput.into());
+        }
+
         let (block, data) = bytes.split_at(size_of::<Block>());
         let block = Block::from_bytes(block)?;
         let data = data.to_vec();
