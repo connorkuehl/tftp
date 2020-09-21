@@ -26,7 +26,7 @@ impl FromBytes for Data {
             return Err(ErrorKind::InvalidInput.into());
         }
 
-        let (block, data) = bytes.split_at(size_of::<Block>());
+        let (block, data) = bytes.split_at(split_at);
         let block = Block::from_bytes(block)?;
         let data = data.to_vec();
 
