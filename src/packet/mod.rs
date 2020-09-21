@@ -128,3 +128,76 @@ impl<T: sealed::Packet> IntoBytes for Packet<T> {
         bytes
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rrq() {
+        let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+        assert_eq!(rrq.header, Opcode::Rrq);
+
+        let op = vec![0, 1];
+        let mut mode = b"netascii\0".to_vec();
+        let mut filename = b"alice-in-wonderland.txt\0".to_vec();
+        let mut bytes = op;
+        bytes.append(&mut filename);
+        bytes.append(&mut mode);
+        assert_eq!(bytes, rrq.into_bytes());
+    }
+
+    #[test]
+    fn test_wrq() {
+        let wrq = Packet::wrq("alice-in-wonderland.txt", Mode::Mail);
+        assert_eq!(wrq.header, Opcode::Wrq);
+
+        let op = vec![0, 2];
+        let mut mode = b"mail\0".to_vec();
+        let mut filename = b"alice-in-wonderland.txt\0".to_vec();
+        let mut bytes = op;
+        bytes.append(&mut filename);
+        bytes.append(&mut mode);
+        assert_eq!(bytes, wrq.into_bytes());
+    }
+
+    #[test]
+    fn test_data() {
+        let data = Packet::data(Block(25), &[1, 2, 3]);
+        assert_eq!(data.header, Opcode::Data);
+
+        let op = vec![0, 3];
+        let mut block = vec![0, 25];
+        let mut dat = vec![1, 2, 3];
+        let mut bytes = op;
+        bytes.append(&mut block);
+        bytes.append(&mut dat);
+        assert_eq!(bytes, data.into_bytes());
+    }
+
+    #[test]
+    fn test_ack() {
+        let ack = Packet::ack(Block(2));
+        assert_eq!(ack.header, Opcode::Ack);
+
+        let op = vec![0, 4];
+        let mut block = vec![0, 2];
+        let mut bytes = op;
+        bytes.append(&mut block);
+        assert_eq!(bytes, ack.into_bytes());
+    }
+
+    #[test]
+    fn test_error() {
+        let error = Packet::error(Code::FileNotFound, "file not found");
+        assert_eq!(error.header, Opcode::Error);
+
+        let op = vec![0, 5];
+        let mut code = vec![0, 1];
+        let mut message = b"file not found\0".to_vec();
+        let mut bytes = op;
+        bytes.append(&mut code);
+        bytes.append(&mut message);
+        assert_eq!(bytes, error.into_bytes());
+    }
+}
