@@ -43,3 +43,32 @@ impl IntoBytes for Rq {
         bytes
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_bytes() {
+        let input = b"alice-in-wonderland.txt\0netascii\0";
+        let actual = Rq::from_bytes(&input[..]).unwrap();
+
+        assert_eq!(actual.filename.as_str(), "alice-in-wonderland.txt");
+        assert_eq!(actual.mode, Mode::NetAscii);
+
+        assert!(Rq::from_bytes(b"no-nul").is_err());
+        assert!(Rq::from_bytes(b"only-filename-here\0").is_err());
+        assert!(Rq::from_bytes(b"only-filename-here\0nonul").is_err());
+    }
+
+    #[test]
+    fn test_to_bytes() {
+        let rq = Rq {
+            filename: "alice-in-wonderland.txt".to_string(),
+            mode: Mode::Octet,
+        };
+
+        let bytes = rq.into_bytes();
+        assert_eq!(&bytes[..], b"alice-in-wonderland.txt\0octet\0");
+    }
+}
