@@ -71,8 +71,17 @@ impl fmt::Display for Code {
 }
 
 pub struct Error {
-    pub code: Code,
-    pub message: String,
+    code: Code,
+    message: String,
+}
+
+impl Error {
+    pub fn new<T: AsRef<str>>(code: Code, message: T) -> Self {
+        Self {
+            code,
+            message: message.as_ref().to_string(),
+        }
+    }
 }
 
 impl Packet for Error {

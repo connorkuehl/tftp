@@ -6,7 +6,10 @@ use super::mode::Mode;
 mod rrq;
 mod wrq;
 
-struct Rq {
+pub use rrq::Rrq;
+pub use wrq::Wrq;
+
+pub struct Rq {
     filename: String,
     mode: Mode,
 }

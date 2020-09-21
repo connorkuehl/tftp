@@ -3,6 +3,11 @@ use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
+use ack::Ack;
+use data::Data;
+use error::{Code, Error};
+use rq::{Rrq, Wrq};
+use mode::Mode;
 use opcode::Opcode;
 
 mod ack;
@@ -45,6 +50,55 @@ impl IntoBytes for Block {
 pub struct Packet<T: sealed::Packet> {
     header: Opcode,
     body: T,
+}
+
+impl<T: sealed::Packet> Packet<T> {
+    fn new(body: T) -> Self {
+        Self {
+            header: T::OPCODE,
+            body,
+        }
+    }
+}
+
+impl Packet<Rrq> {
+    pub fn rrq(filename: String, mode: Mode) -> Self {
+        let rrq = Rrq::new(filename, mode);
+
+        Self::new(rrq)
+    }
+}
+
+impl Packet<Wrq> {
+    pub fn wrq(filename: String, mode: Mode) -> Self {
+        let wrq = Wrq::new(filename, mode);
+
+        Self::new(wrq)
+    }
+}
+
+impl Packet<Data> {
+    pub fn data<T: AsRef<[u8]>>(block: Block, data: T) -> Self {
+        let data = Data::new(block, data);
+
+        Self::new(data)
+    }
+}
+
+impl Packet<Ack> {
+    pub fn ack(block: Block) -> Self {
+        let ack = Ack::new(block);
+
+        Self::new(ack)
+    }
+}
+
+impl Packet<Error> {
+    pub fn error<T: AsRef<str>>(code: Code, message: T) -> Self {
+        let error = Error::new(code, message);
+
+        Self::new(error)
+    }
 }
 
 impl<T: sealed::Packet> FromBytes for Packet<T> {

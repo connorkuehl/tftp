@@ -10,6 +10,12 @@ pub struct Ack {
     pub block: Block,
 }
 
+impl Ack {
+    pub fn new(block: Block) -> Self {
+        Self { block }
+    }
+}
+
 impl Packet for Ack {
     const OPCODE: Opcode = Opcode::Ack;
 }

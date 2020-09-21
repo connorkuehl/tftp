@@ -11,6 +11,15 @@ pub struct Data {
     pub data: Vec<u8>,
 }
 
+impl Data {
+    pub fn new<T: AsRef<[u8]>>(block: Block, data: T) -> Self {
+        Self {
+            block,
+            data: data.as_ref().to_vec(),
+        }
+    }
+}
+
 impl Packet for Data {
     const OPCODE: Opcode = Opcode::Data;
 }
