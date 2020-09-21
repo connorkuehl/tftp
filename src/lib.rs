@@ -1,2 +1,2 @@
 mod bytes;
-mod packet;
+pub mod packet;

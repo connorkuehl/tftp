@@ -3,12 +3,12 @@ use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
-use ack::Ack;
-use data::Data;
-use error::{Code, Error};
-use rq::{Rrq, Wrq};
-use mode::Mode;
-use opcode::Opcode;
+pub use ack::Ack;
+pub use data::Data;
+pub use error::{Code, Error};
+pub use rq::{Rrq, Wrq};
+pub use mode::Mode;
+pub use opcode::Opcode;
 
 mod ack;
 mod data;
