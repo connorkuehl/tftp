@@ -118,4 +118,32 @@ mod tests {
         assert_eq!(Code::from_u16(7).unwrap(), Code::NoSuchUser);
         assert!(Code::from_u16(8).is_err());
     }
+
+    #[test]
+    fn test_from_bytes() {
+        let input = &[0, 5, b'm', b'e', b's', b's', b'a', b'g', b'e', b'\0'];
+        let actual = Error::from_bytes(&input[..]).unwrap();
+
+        assert_eq!(actual.code, Code::UnknownTid);
+        assert_eq!(actual.message.as_str(), "message");
+
+        let input = &[0, 0, b'\0'];
+        let actual = Error::from_bytes(&input[..]).unwrap();
+        assert_eq!(actual.code, Code::NotDefined);
+        assert_eq!(actual.message.as_str(), "");
+
+        assert!(Error::from_bytes(&[0, 1]).is_err());
+        assert!(Error::from_bytes(&[2, b'\0']).is_err());
+    }
+
+    #[test]
+    fn test_into_bytes() {
+        let error = Error {
+            code: Code::AccessViolation,
+            message: format!("{}", Code::AccessViolation),
+        };
+
+        let bytes = error.into_bytes();
+        assert_eq!(&bytes[..], &[0, 2, b'A', b'c', b'c', b'e', b's', b's', b' ', b'v', b'i', b'o', b'l', b'a', b't', b'i', b'o', b'n', b'\0']);
+    }
 }
