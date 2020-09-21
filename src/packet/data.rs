@@ -43,3 +43,36 @@ impl IntoBytes for Data {
         bytes
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_bytes() {
+        let input = vec![0x00, 0x01, b'p', b'o', b't', b'a', b't', b'o'];
+        let actual = Data::from_bytes(&input[..]).unwrap();
+
+        assert_eq!(actual.block, Block(1));
+        assert_eq!(actual.data, b"potato");
+
+        let input = &[0, 2];
+        let actual = Data::from_bytes(&input[..]).unwrap();
+
+        assert_eq!(actual.block, Block(2));
+        assert_eq!(actual.data, &[]);
+
+        assert!(Data::from_bytes(&[0]).is_err());
+    }
+
+    #[test]
+    fn test_into_bytes() {
+        let data = Data {
+            block: Block(50),
+            data: vec![1, 2, 3],
+        };
+
+        let bytes = data.into_bytes();
+        assert_eq!(&bytes[..], &[0, 50, 1, 2, 3]);
+    }
+}
