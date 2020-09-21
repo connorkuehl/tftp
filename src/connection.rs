@@ -26,7 +26,7 @@ impl Connection {
                     let _error = Packet::<Error>::from_bytes(&buf[..])?;
                     /* FIXME */
                     return Err(io::Error::new(io::ErrorKind::Other, "got error packet"));
-                },
+                }
                 Ok(d) => d,
             };
 
@@ -62,7 +62,7 @@ impl Connection {
                     let _error = Packet::<Error>::from_bytes(&buf[..])?;
                     /* FIXME */
                     return Err(io::Error::new(io::ErrorKind::Other, "got error packet"));
-                },
+                }
                 Ok(a) => a,
             };
 

@@ -38,14 +38,19 @@ impl Client<New> {
             server,
         };
 
-        Ok(Client { connection: with_server })
+        Ok(Client {
+            connection: with_server,
+        })
     }
 }
 
 impl<A: ToSocketAddrs> Client<ConnectTo<A>> {
     pub fn get<S: AsRef<str>, W: Write>(self, file: S, mode: Mode, writer: W) -> Result<W> {
         let rrq = Packet::rrq(file, mode);
-        let _ = self.connection.socket.send_to(&rrq.into_bytes()[..], self.connection.server)?;
+        let _ = self
+            .connection
+            .socket
+            .send_to(&rrq.into_bytes()[..], self.connection.server)?;
 
         let mut buf = [0; MAX_PACKET_SIZE];
         let (_, server) = self.connection.socket.peek_from(&mut buf)?;
@@ -55,9 +60,12 @@ impl<A: ToSocketAddrs> Client<ConnectTo<A>> {
         conn.get(writer)
     }
 
-    pub fn put<S: AsRef<str>, R: Read>(self, file: S, mode: Mode,  reader: R) -> Result<()> {
+    pub fn put<S: AsRef<str>, R: Read>(self, file: S, mode: Mode, reader: R) -> Result<()> {
         let wrq = Packet::wrq(file, mode);
-        let _ = self.connection.socket.send_to(&wrq.into_bytes()[..], self.connection.server)?;
+        let _ = self
+            .connection
+            .socket
+            .send_to(&wrq.into_bytes()[..], self.connection.server)?;
 
         let mut buf = [0; MAX_PACKET_SIZE];
         let (nbytes, server) = self.connection.socket.recv_from(&mut buf)?;

@@ -1,20 +1,30 @@
-use std::fs::File;
 use std::env;
-use std::path::Path;
+use std::fs::File;
 use std::io::{Result, Write};
 use std::net::ToSocketAddrs;
+use std::path::Path;
 
 use tftp::packet::Mode;
-use tftp::{ConnectTo, Client};
+use tftp::{Client, ConnectTo};
 
 fn put<T: AsRef<Path>, A: ToSocketAddrs>(src: T, client: Client<ConnectTo<A>>) {
-    let target = src.as_ref().file_name().unwrap().to_str().unwrap().to_string();
+    let target = src
+        .as_ref()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     let source = File::open(src).unwrap();
 
     client.put(target, Mode::NetAscii, source).unwrap();
 }
 
-fn get<T: AsRef<str>, W: Write, A: ToSocketAddrs>(file: T, client: Client<ConnectTo<A>>, write: W) -> Result<W> {
+fn get<T: AsRef<str>, W: Write, A: ToSocketAddrs>(
+    file: T,
+    client: Client<ConnectTo<A>>,
+    write: W,
+) -> Result<W> {
     client.get(file, Mode::NetAscii, write)
 }
 
@@ -29,7 +39,9 @@ fn main() {
         .unwrap();
 
     match verb.as_str() {
-        "get" => { let _ = get(file, client, std::io::stdout()).unwrap(); },
+        "get" => {
+            let _ = get(file, client, std::io::stdout()).unwrap();
+        }
         "put" => put(file, client),
         _ => panic!("unknown verb"),
     }
