@@ -62,7 +62,7 @@ mod tests {
     }
 
     #[test]
-    fn test_to_bytes() {
+    fn test_into_bytes() {
         let rq = Rq {
             filename: "alice-in-wonderland.txt".to_string(),
             mode: Mode::Octet,
