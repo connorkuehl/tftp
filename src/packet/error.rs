@@ -1,8 +1,11 @@
 use std::convert::AsRef;
 use std::fmt;
 use std::io::{self, ErrorKind, Result};
+use std::mem::size_of;
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
+use crate::packet::sealed::Packet;
+use crate::packet::opcode::Opcode;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Code {
@@ -67,10 +70,36 @@ impl fmt::Display for Code {
     }
 }
 
-#[derive(Debug)]
 pub struct Error {
     pub code: Code,
     pub message: String,
+}
+
+impl Packet for Error {
+    const OPCODE: Opcode = Opcode::Error;
+}
+
+impl FromBytes for Error {
+    type Error = io::Error;
+
+    fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self> {
+        let bytes = bytes.as_ref();
+        let (code, message) = bytes.split_at(size_of::<u16>());
+        let code = Code::from_bytes(code)?;
+        let message = Bytes::from_bytes(message)?;
+        let message = message.into_inner();
+
+        Ok(Self { code, message })
+    }
+}
+
+impl IntoBytes for Error {
+    fn into_bytes(self) -> Vec<u8> {
+        let mut bytes = self.code.into_bytes();
+        let mut message = Bytes::new(self.message).into_bytes();
+        bytes.append(&mut message);
+        bytes
+    }
 }
 
 #[cfg(test)]
