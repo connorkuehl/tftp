@@ -1,6 +1,6 @@
 use std::env;
-use std::io::{self, Read, Result, Write};
-use std::fs::{File, OpenOptions};
+use std::io::{self, Result};
+use std::fs::OpenOptions;
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::path::Path;
 
@@ -67,14 +67,14 @@ impl Handler {
 
     pub fn handle(self) -> Result<()> {
         match self.direction {
-            Direction::Get(ref rrq) => self.get(),
-            Direction::Put(ref wrq) => self.put(),
+            Direction::Get(_) => self.get(),
+            Direction::Put(_) => self.put(),
         }
     }
 
     fn get(self) -> Result<()> {
         if let Direction::Get(rrq) = self.direction {
-            let mut f = OpenOptions::new()
+            let f = OpenOptions::new()
                 .read(true)
                 .open(rrq.body.0.filename)?;
             let conn = Connection::new(self.socket);
@@ -87,7 +87,7 @@ impl Handler {
 
     fn put(self) -> Result<()> {
         if let Direction::Put(wrq) = self.direction {
-            let mut f = OpenOptions::new()
+            let f = OpenOptions::new()
                 .write(true)
                 .truncate(true)
                 .open(wrq.body.0.filename)?;

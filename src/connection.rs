@@ -1,5 +1,4 @@
 use std::io::{self, Read, Result, Write};
-use std::mem::size_of;
 use std::net::UdpSocket;
 
 use crate::bytes::{FromBytes, IntoBytes};
@@ -18,15 +17,13 @@ impl Connection {
     }
 
     pub fn get<W: Write>(self, mut writer: W) -> Result<W> {
-        let mut blocks_recvd = 1;
-
         loop {
             let mut buf = [0; MAX_PACKET_SIZE];
             let bytes_recvd = self.socket.recv(&mut buf)?;
 
             let data = match Packet::<Data>::from_bytes(&buf[..bytes_recvd]) {
                 Err(_) => {
-                    let error = Packet::<Error>::from_bytes(&buf[..])?;
+                    let _error = Packet::<Error>::from_bytes(&buf[..])?;
                     /* FIXME */
                     return Err(io::Error::new(io::ErrorKind::Other, "got error packet"));
                 },
@@ -35,7 +32,6 @@ impl Connection {
 
             let _ = writer.write(&data.body.data[..])?;
 
-            blocks_recvd += 1;
             let ack = Packet::ack(data.body.block);
             let _ = self.socket.send(&mut ack.into_bytes()[..])?;
 
@@ -63,7 +59,7 @@ impl Connection {
 
             let ack = match Packet::<Ack>::from_bytes(&buf[..bytes_recvd]) {
                 Err(_) => {
-                    let error = Packet::<Error>::from_bytes(&buf[..])?;
+                    let _error = Packet::<Error>::from_bytes(&buf[..])?;
                     /* FIXME */
                     return Err(io::Error::new(io::ErrorKind::Other, "got error packet"));
                 },
