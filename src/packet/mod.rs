@@ -111,6 +111,34 @@ impl Packet<Error> {
     }
 }
 
+impl From<io::Error> for Packet<Error> {
+    fn from(err: io::Error) -> Packet<Error> {
+        let code = match err.kind() {
+            ErrorKind::NotFound => Code::FileNotFound,
+            ErrorKind::PermissionDenied => Code::AccessViolation,
+            ErrorKind::AlreadyExists => Code::FileAlreadyExists,
+            _ => Code::NotDefined,
+        };
+
+        let message = format!("{}", code);
+
+        Packet::error(code, message)
+    }
+}
+
+impl From<Packet<Error>> for io::Error {
+    fn from(err: Packet<Error>) -> io::Error {
+        let kind = match err.body.code {
+            Code::FileNotFound => ErrorKind::NotFound,
+            Code::AccessViolation => ErrorKind::PermissionDenied,
+            Code::FileAlreadyExists => ErrorKind::AlreadyExists,
+            _ => ErrorKind::Other,
+        };
+
+        io::Error::new(kind, err.body.message)
+    }
+}
+
 impl<T: sealed::Packet> FromBytes for Packet<T> {
     type Error = io::Error;
 

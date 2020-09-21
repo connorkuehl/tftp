@@ -23,9 +23,8 @@ impl Connection {
 
             let data = match Packet::<Data>::from_bytes(&buf[..bytes_recvd]) {
                 Err(_) => {
-                    let _error = Packet::<Error>::from_bytes(&buf[..])?;
-                    /* FIXME */
-                    return Err(io::Error::new(io::ErrorKind::Other, "got error packet"));
+                    let error = Packet::<Error>::from_bytes(&buf[..bytes_recvd])?;
+                    return Err(io::Error::from(error));
                 }
                 Ok(d) => d,
             };
@@ -59,9 +58,8 @@ impl Connection {
 
             let ack = match Packet::<Ack>::from_bytes(&buf[..bytes_recvd]) {
                 Err(_) => {
-                    let _error = Packet::<Error>::from_bytes(&buf[..])?;
-                    /* FIXME */
-                    return Err(io::Error::new(io::ErrorKind::Other, "got error packet"));
+                    let error = Packet::<Error>::from_bytes(&buf[..bytes_recvd])?;
+                    return Err(io::Error::from(error));
                 }
                 Ok(a) => a,
             };

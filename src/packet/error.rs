@@ -72,8 +72,8 @@ impl fmt::Display for Code {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {
-    code: Code,
-    message: String,
+    pub code: Code,
+    pub message: String,
 }
 
 impl Error {

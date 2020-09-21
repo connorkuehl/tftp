@@ -79,7 +79,14 @@ impl Handler {
 
     fn get(self) -> Result<()> {
         if let Direction::Get(rrq) = self.direction {
-            let f = OpenOptions::new().read(true).open(rrq.body.0.filename)?;
+            let f = match OpenOptions::new().read(true).open(rrq.body.0.filename) {
+                Ok(f) => f,
+                Err(e) => {
+                    let error: Packet<Error> = e.into();
+                    let _ = self.socket.send(&error.clone().into_bytes()[..]);
+                    return Err(io::Error::from(error));
+                }
+            };
             let conn = Connection::new(self.socket);
             conn.put(f)?;
             Ok(())
@@ -90,12 +97,20 @@ impl Handler {
 
     fn put(self) -> Result<()> {
         if let Direction::Put(wrq) = self.direction {
-            let f = OpenOptions::new()
+            let f = match OpenOptions::new()
                 .write(true)
                 .create(true)
                 /* FIXME: Not sure why this hangs if create is not specified */
                 .truncate(true)
-                .open(wrq.body.0.filename)?;
+                .open(wrq.body.0.filename)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    let error: Packet<Error> = e.into();
+                    let _ = self.socket.send(&error.clone().into_bytes()[..]);
+                    return Err(io::Error::from(error));
+                }
+            };
             let ack = Packet::ack(Block::new(0));
             let _ = self.socket.send(&mut ack.into_bytes()[..])?;
 

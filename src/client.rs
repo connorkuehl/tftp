@@ -1,4 +1,4 @@
-use std::io::{Read, Result, Write};
+use std::io::{self, Read, Result, Write};
 use std::net::{ToSocketAddrs, UdpSocket};
 
 use rand::Rng;
@@ -71,7 +71,13 @@ impl<A: ToSocketAddrs> Client<ConnectTo<A>> {
         let (nbytes, server) = self.connection.socket.recv_from(&mut buf)?;
         self.connection.socket.connect(server)?;
 
-        let _ = Packet::<Ack>::from_bytes(&buf[..nbytes])?;
+        let _ = match Packet::<Ack>::from_bytes(&buf[..nbytes]) {
+            Ok(a) => a,
+            Err(e) => {
+                let error: Packet<Error> = e.into();
+                return Err(io::Error::from(error));
+            }
+        };
 
         let conn = Connection::new(self.connection.socket);
         conn.put(reader)
