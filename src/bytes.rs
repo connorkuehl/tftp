@@ -101,4 +101,32 @@ mod tests {
         let input = b"no nul byte here!";
         assert_eq!(None, input.first_nul_idx());
     }
+
+    #[test]
+    fn test_from_bytes_u16() {
+        let n = 55u16;
+        let actual = Bytes::from_bytes(&n.to_be_bytes()[..]).unwrap();
+        assert_eq!(n, actual.into_inner());
+    }
+
+    #[test]
+    fn test_into_bytes_u16() {
+        let n = 55u16;
+        let b = Bytes::new(n);
+        assert_eq!(&n.to_be_bytes()[..], &b.into_bytes()[..]);
+    }
+
+    #[test]
+    fn test_from_bytes_string() {
+        let b: Bytes<String> = Bytes::from_bytes(b"hello, world!\0").unwrap();
+        let actual = b.into_inner();
+        assert_eq!("hello, world!", actual.as_str());
+    }
+
+    #[test]
+    fn test_into_bytes_string() {
+        let b = Bytes::new("hello, world!".to_string());
+        let actual = b.into_bytes();
+        assert_eq!(b"hello, world!\0", &actual[..]);
+    }
 }
