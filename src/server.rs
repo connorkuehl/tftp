@@ -1,3 +1,6 @@
+//! A TFTP server. Implementors can use this to build a more richly-featured
+//! server application.
+
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{self, Result};
@@ -10,9 +13,12 @@ use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
 use crate::packet::*;
 
+/// A TFTP server.
 pub struct Server(UdpSocket);
 
 impl Server {
+    /// Creates a server configured to serve files from a given directory on
+    /// a given address.
     pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(bind_to: A, serve_from: P) -> Result<Self> {
         let socket = UdpSocket::bind(bind_to)?;
         env::set_current_dir(serve_from)?;
@@ -20,6 +26,15 @@ impl Server {
         Ok(Self(socket))
     }
 
+    /// Waits for requests and returns a `Handler` instance.
+    ///
+    /// It is intended that implementors will loop on this method and may
+    /// optionally use the decoupled `Handler` instance at a time of their
+    /// choosing to service the request.
+    ///
+    /// This is designed to be friendly to server implementations of all types.
+    /// For example, a server application that employs the use of a thread pool
+    /// can simply send the `Handler` off into the thread pool to be serviced.Ack
     /* TODO: Maybe return option instead? */
     pub fn serve(&self) -> Result<Handler> {
         let mut buf = [0; MAX_PACKET_SIZE];
@@ -53,6 +68,7 @@ enum Direction {
     Put(Packet<Wrq>),
 }
 
+/// Handles a request from a single TFTP client.
 pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
@@ -70,6 +86,7 @@ impl Handler {
         Ok(Handler { socket, direction })
     }
 
+    /// Completes the handshake with the client and services the request.
     pub fn handle(self) -> Result<()> {
         match self.direction {
             Direction::Get(_) => self.get(),
