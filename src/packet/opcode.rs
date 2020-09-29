@@ -1,19 +1,33 @@
+//! Describes the opcodes defined by RFC 1350.
+
 use std::convert::AsRef;
 use std::fmt;
 use std::io::{self, ErrorKind, Result};
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
 
+/// An integer identifier for the type of TFTP packet.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Opcode {
+    /// Read request.
     Rrq = 1,
+
+    /// Write request.
     Wrq = 2,
+
+    /// Data.
     Data = 3,
+
+    /// Acknowledges successful receipt of a `Data` packet.
     Ack = 4,
+
+    /// A courtesy packet to indicate the peer has experienced an error
+    /// and will not complete the transmission.
     Error = 5,
 }
 
 impl Opcode {
+    /// Tries to produce an `Opcode` from a `u16`.
     pub fn from_u16(val: u16) -> Result<Self> {
         Ok(match val {
             v if v == 1 => Opcode::Rrq,

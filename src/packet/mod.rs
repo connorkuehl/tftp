@@ -1,3 +1,5 @@
+//! Parsing and creating TFTP packets.
+
 use std::convert::AsRef;
 use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
@@ -17,7 +19,10 @@ mod mode;
 mod opcode;
 mod rq;
 
+/// The maximum number of bytes carried in a `Data` packet.
 pub const MAX_PAYLOAD_SIZE: usize = 512;
+
+/// The total size of a TFTP packet. (512 + 2 byte opcode + 2 byte block ID)
 pub const MAX_PACKET_SIZE: usize = 516;
 
 mod sealed {
@@ -29,10 +34,12 @@ mod sealed {
     }
 }
 
+/// An identifier for a `Data` block and its corresponding `Ack` packet.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Block(u16);
 
 impl Block {
+    /// Creates a new `Block`.
     pub fn new(val: u16) -> Self {
         Self(val)
     }
@@ -56,9 +63,13 @@ impl IntoBytes for Block {
     }
 }
 
+/// A TFTP packet.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Packet<T: sealed::Packet> {
+    /// Describes the packet.
     pub header: Opcode,
+
+    /// Contains the packet payload.
     pub body: T,
 }
 
@@ -72,6 +83,7 @@ impl<T: sealed::Packet> Packet<T> {
 }
 
 impl Packet<Rrq> {
+    /// Creates a new read request packet.
     pub fn rrq<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let rrq = Rrq::new(filename, mode);
 
@@ -80,6 +92,7 @@ impl Packet<Rrq> {
 }
 
 impl Packet<Wrq> {
+    /// Creates a new write request packet.
     pub fn wrq<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let wrq = Wrq::new(filename, mode);
 
@@ -88,6 +101,7 @@ impl Packet<Wrq> {
 }
 
 impl Packet<Data> {
+    /// Creates a new data packet.
     pub fn data<T: AsRef<[u8]>>(block: Block, data: T) -> Self {
         let data = Data::new(block, data);
 
@@ -96,6 +110,7 @@ impl Packet<Data> {
 }
 
 impl Packet<Ack> {
+    /// Creates a new ack packet.
     pub fn ack(block: Block) -> Self {
         let ack = Ack::new(block);
 
@@ -104,6 +119,7 @@ impl Packet<Ack> {
 }
 
 impl Packet<Error> {
+    /// Creates a new error packet.
     pub fn error<T: AsRef<str>>(code: Code, message: T) -> Self {
         let error = Error::new(code, message);
 

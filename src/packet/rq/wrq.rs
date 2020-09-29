@@ -1,3 +1,5 @@
+//! A Write Request indicates the peer wants to transmit a file.
+
 use std::io::{self, Result};
 
 use super::Rq;
@@ -6,10 +8,12 @@ use crate::packet::mode::Mode;
 use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 
+/// A write request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Wrq(pub Rq);
 
 impl Wrq {
+    /// Creates a new `Wrq`.
     pub fn new<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let filename = filename.as_ref().to_string();
         Self(Rq { filename, mode })

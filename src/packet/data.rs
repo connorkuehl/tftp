@@ -1,3 +1,8 @@
+//! A `Data` packet encapsulates a block of data.
+//!
+//! If a `Data` block contains less than 512 bytes as its payload,
+//! then it is the final `Data` block to be sent.
+
 use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
@@ -6,13 +11,18 @@ use crate::bytes::{FromBytes, IntoBytes};
 use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 
+/// A vehicle for transmitting up to 512 bytes of a file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Data {
+    /// The identifier for this data.
     pub block: Block,
+
+    /// The payload.
     pub data: Vec<u8>,
 }
 
 impl Data {
+    /// Creates a new `Data` block.
     pub fn new<T: AsRef<[u8]>>(block: Block, data: T) -> Self {
         Self {
             block,

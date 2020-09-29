@@ -1,3 +1,6 @@
+//! An `Ack` packet is a receipt for a successfully transmitted
+//! block.
+
 use std::io::{self, ErrorKind, Result};
 use std::mem::size_of;
 
@@ -6,12 +9,15 @@ use crate::bytes::{FromBytes, IntoBytes};
 use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 
+/// An acknowledgement that a `Data` packet has been received successfully.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ack {
+    /// The number of the block that is being acknowledged.
     pub block: Block,
 }
 
 impl Ack {
+    /// Creates a new `Ack` packet.
     pub fn new(block: Block) -> Self {
         Self { block }
     }

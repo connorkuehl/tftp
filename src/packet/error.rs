@@ -1,3 +1,5 @@
+//! Describes an `Error` packet.
+
 use std::convert::AsRef;
 use std::fmt;
 use std::io::{self, ErrorKind, Result};
@@ -7,6 +9,8 @@ use crate::bytes::{Bytes, FromBytes, IntoBytes};
 use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 
+/// Error codes defined by RFC 1350.
+#[allow(missing_docs)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Code {
     NotDefined = 0,
@@ -20,6 +24,7 @@ pub enum Code {
 }
 
 impl Code {
+    /// Attempts to convert a `u16` into an error `Code`.
     pub fn from_u16(val: u16) -> Result<Self> {
         Ok(match val {
             v if v == 0 => Code::NotDefined,
@@ -70,13 +75,18 @@ impl fmt::Display for Code {
     }
 }
 
+/// An `Error` packet is a courtesy packet sent by the peer that experiences
+/// a fault that prevents it from resuming the TFTP transmission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {
+    /// Describes what type of error this is.
     pub code: Code,
+    /// The error's message, if any.
     pub message: String,
 }
 
 impl Error {
+    /// Creates a new `Error`.
     pub fn new<T: AsRef<str>>(code: Code, message: T) -> Self {
         Self {
             code,

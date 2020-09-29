@@ -1,3 +1,5 @@
+//! A Read Request indicates that a peer wants to receive a file.
+
 use std::io::{self, Result};
 
 use super::Rq;
@@ -6,10 +8,12 @@ use crate::packet::mode::Mode;
 use crate::packet::opcode::Opcode;
 use crate::packet::sealed::Packet;
 
+/// A read request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Rrq(pub Rq);
 
 impl Rrq {
+    /// Creates a new `Rrq`.
     pub fn new<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let filename = filename.as_ref().to_string();
         Self(Rq { filename, mode })

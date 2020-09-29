@@ -1,3 +1,8 @@
+//! A "general" request.
+//!
+//! This module is meant to be specialized by submodules and
+//! therefore it is not meant to be used directly.
+
 use std::io::{self, ErrorKind, Result};
 
 use super::mode::Mode;

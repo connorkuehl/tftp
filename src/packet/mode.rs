@@ -1,17 +1,28 @@
+//! Describes the modes of operation for TFTP.
+//!
+//! `Mail` is deprecated and should not be implemented.
+
 use std::fmt;
 use std::io::{self, ErrorKind, Result};
 use std::str::FromStr;
 
 use crate::bytes::{Bytes, FromBytes, IntoBytes};
 
+/// The modes of operation for TFTP.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
+    /// Deprecated.
     Mail,
+
+    /// 7-bit ASCII.
     NetAscii,
+
+    /// 8-bit binary.
     Octet,
 }
 
 impl Mode {
+    /// Produces a `String` representation of this `Mode`.
     pub fn into_string(self) -> String {
         let s = match self {
             Mode::Mail => "mail",
