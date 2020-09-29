@@ -9,3 +9,6 @@ license = "Apache-2.0"
 
 [dependencies]
 rand = "0.7.3"
+
+[dev-dependencies]
+tempfile = "3.1.0"
