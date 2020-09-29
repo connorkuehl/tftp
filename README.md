@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/connorkuehl/tftp.svg?branch=main)](https://travis-ci.org/connorkuehl/tftp)
+
 # tftp
 
 The `tftp` crate provides implementations for the following components of
