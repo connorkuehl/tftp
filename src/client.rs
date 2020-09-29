@@ -1,3 +1,6 @@
+//! A client-side connection to a TFTP server. Implementors can use this
+//! to build a more fully-featured client application.
+
 use std::io::{self, Read, Result, Write};
 use std::iter::Iterator;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
@@ -8,25 +11,34 @@ use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
 use crate::packet::*;
 
+/// The initial state for building a `Client`.
 pub struct New {
     socket: UdpSocket,
 }
 
+/// An intermediate state for building a `Client`.Builder
+///
+/// At this point, the `Builder` has all the information
+/// it needs to construct a client.
 pub struct ConnectTo {
     server: Vec<SocketAddr>,
     socket: UdpSocket,
 }
 
+/// Builds a `Client`.
 pub struct Builder<T> {
     data: T,
 }
 
+/// Represents a single connection with a TFTP server.
 pub struct Client {
     server: Vec<SocketAddr>,
     socket: UdpSocket,
 }
 
 impl Builder<New> {
+    /// Generates a Transfer ID (a bind address & port) and opens a `UdpSocket`
+    /// for this connection.
     pub fn new() -> Result<Self> {
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(1001, u16::MAX);
@@ -38,6 +50,7 @@ impl Builder<New> {
         Ok(Builder { data })
     }
 
+    /// Stores the Transfer ID (address + port) of the server to connect to.
     pub fn connect_to<A: ToSocketAddrs>(self, server: A) -> Result<Builder<ConnectTo>> {
         let resolved = server.to_socket_addrs()?.collect();
         let data = ConnectTo {
@@ -50,6 +63,7 @@ impl Builder<New> {
 }
 
 impl Builder<ConnectTo> {
+    /// Constructs the client.
     pub fn build(self) -> Client {
         Client {
             server: self.data.server,
@@ -59,6 +73,7 @@ impl Builder<ConnectTo> {
 }
 
 impl Client {
+    /// Retrieves a file from the remote server.
     pub fn get<S: AsRef<str>, W: Write>(self, file: S, mode: Mode, writer: W) -> Result<W> {
         let rrq = Packet::rrq(file, mode);
         let _ = self
@@ -73,6 +88,7 @@ impl Client {
         conn.get(writer)
     }
 
+    /// Stores a file on the remote server.
     pub fn put<S: AsRef<str>, R: Read>(self, file: S, mode: Mode, reader: R) -> Result<()> {
         let wrq = Packet::wrq(file, mode);
         let _ = self
