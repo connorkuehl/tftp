@@ -1,13 +1,13 @@
 use std::env;
 use std::fs::File;
 use std::io::{Result, Write};
-use std::net::ToSocketAddrs;
 use std::path::Path;
 
+use tftp::client;
 use tftp::packet::Mode;
-use tftp::{Client, ConnectTo};
+use tftp::Client;
 
-fn put<T: AsRef<Path>, A: ToSocketAddrs>(src: T, client: Client<ConnectTo<A>>) {
+fn put<T: AsRef<Path>>(src: T, client: Client) {
     let target = src
         .as_ref()
         .file_name()
@@ -20,11 +20,7 @@ fn put<T: AsRef<Path>, A: ToSocketAddrs>(src: T, client: Client<ConnectTo<A>>) {
     client.put(target, Mode::NetAscii, source).unwrap();
 }
 
-fn get<T: AsRef<str>, W: Write, A: ToSocketAddrs>(
-    file: T,
-    client: Client<ConnectTo<A>>,
-    write: W,
-) -> Result<W> {
+fn get<T: AsRef<str>, W: Write>(file: T, client: Client, write: W) -> Result<W> {
     client.get(file, Mode::NetAscii, write)
 }
 
@@ -34,9 +30,11 @@ fn main() {
     let verb = args.next().unwrap();
     let file = args.next().unwrap();
 
-    let client = Client::new()
-        .map(|c| c.connect_to(server).unwrap())
-        .unwrap();
+    let client = client::Builder::new()
+        .unwrap()
+        .connect_to(server)
+        .unwrap()
+        .build();
 
     match verb.as_str() {
         "get" => {

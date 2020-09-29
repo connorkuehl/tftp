@@ -38,7 +38,7 @@
 //! Alternatively, you may connect to your server from another host.
 
 mod bytes;
-mod client;
+pub mod client;
 mod connection;
 pub mod packet;
 mod server;
