@@ -37,6 +37,8 @@
 //!
 //! Alternatively, you may connect to your server from another host.
 
+#![deny(missing_docs)]
+
 mod bytes;
 pub mod client;
 mod connection;
