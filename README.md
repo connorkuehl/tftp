@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/connorkuehl/tftp.svg?branch=main)](https://travis-ci.org/connorkuehl/tftp)
+[![Build Status](https://travis-ci.com/connorkuehl/tftp.svg?branch=main)](https://travis-ci.com/connorkuehl/tftp)
 
 # tftp
 
