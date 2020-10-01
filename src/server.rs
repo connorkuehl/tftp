@@ -119,7 +119,7 @@ impl Handler {
                 .create(true)
                 /* FIXME: Not sure why this hangs if create is not specified */
                 .truncate(true)
-                .open(wrq.body.0.filename)
+                .open(&wrq.body.request().filename)
             {
                 Ok(f) => f,
                 Err(e) => {
