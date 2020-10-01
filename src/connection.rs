@@ -64,7 +64,7 @@ impl Connection {
                 Ok(a) => a,
             };
 
-            assert_eq!(Block::new(current_block), ack.body.block);
+            assert_eq!(Block::new(current_block), ack.body.block());
             current_block += 1;
 
             if bytes_read < MAX_PAYLOAD_SIZE {

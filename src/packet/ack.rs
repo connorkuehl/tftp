@@ -13,13 +13,18 @@ use crate::packet::sealed::Packet;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ack {
     /// The number of the block that is being acknowledged.
-    pub block: Block,
+    block: Block,
 }
 
 impl Ack {
     /// Creates a new `Ack` packet.
     pub fn new(block: Block) -> Self {
         Self { block }
+    }
+
+    /// Returns the number of the block that is being acknowledged
+    pub fn block(&self) -> Block {
+        self.block
     }
 }
 
