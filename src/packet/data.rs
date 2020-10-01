@@ -15,10 +15,10 @@ use crate::packet::sealed::Packet;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Data {
     /// The identifier for this data.
-    pub block: Block,
+    block: Block,
 
     /// The payload.
-    pub data: Vec<u8>,
+    data: Vec<u8>,
 }
 
 impl Data {
@@ -28,6 +28,16 @@ impl Data {
             block,
             data: data.as_ref().to_vec(),
         }
+    }
+
+    /// Returns the identifier for the data
+    pub fn block(&self) -> Block {
+        self.block
+    }
+
+    /// Returns the payload
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
     }
 }
 

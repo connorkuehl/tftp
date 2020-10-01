@@ -29,12 +29,12 @@ impl Connection {
                 Ok(d) => d,
             };
 
-            let _ = writer.write(&data.body.data[..])?;
+            let _ = writer.write(&data.body.data()[..])?;
 
-            let ack = Packet::ack(data.body.block);
+            let ack = Packet::ack(data.body.block());
             let _ = self.socket.send(&ack.into_bytes()[..])?;
 
-            if data.body.data.len() < MAX_PAYLOAD_SIZE {
+            if data.body.data().len() < MAX_PAYLOAD_SIZE {
                 break;
             }
         }
