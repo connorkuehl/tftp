@@ -67,10 +67,10 @@ impl IntoBytes for Block {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Packet<T: sealed::Packet> {
     /// Describes the packet.
-    pub header: Opcode,
+    header: Opcode,
 
     /// Contains the packet payload.
-    pub body: T,
+    body: T,
 }
 
 impl<T: sealed::Packet> Packet<T> {
@@ -79,6 +79,16 @@ impl<T: sealed::Packet> Packet<T> {
             header: T::OPCODE,
             body,
         }
+    }
+
+    /// Returns the opcode for the packet
+    pub fn header(&self) -> Opcode {
+        self.header
+    }
+
+    /// Returns a reference to the packet's payload
+    pub fn body(&self) -> &T {
+        &self.body
     }
 }
 
