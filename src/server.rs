@@ -96,7 +96,7 @@ impl Handler {
 
     fn get(self) -> Result<()> {
         if let Direction::Get(rrq) = self.direction {
-            let f = match OpenOptions::new().read(true).open(rrq.body.0.filename) {
+            let f = match OpenOptions::new().read(true).open(&rrq.body.request().filename) {
                 Ok(f) => f,
                 Err(e) => {
                     let error: Packet<Error> = e.into();

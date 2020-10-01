@@ -10,13 +10,18 @@ use crate::packet::sealed::Packet;
 
 /// A read request.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Rrq(pub Rq);
+pub struct Rrq(Rq);
 
 impl Rrq {
     /// Creates a new `Rrq`.
     pub fn new<T: AsRef<str>>(filename: T, mode: Mode) -> Self {
         let filename = filename.as_ref().to_string();
         Self(Rq { filename, mode })
+    }
+
+    /// Returns a reference to the inner request
+    pub fn request(&self) -> &Rq {
+        &self.0
     }
 }
 
