@@ -98,7 +98,7 @@ impl Handler {
         if let Direction::Get(rrq) = self.direction {
             let f = match OpenOptions::new()
                 .read(true)
-                .open(&rrq.body().request().filename)
+                .open(rrq.body().request().filename())
             {
                 Ok(f) => f,
                 Err(e) => {
@@ -122,7 +122,7 @@ impl Handler {
                 .create(true)
                 /* FIXME: Not sure why this hangs if create is not specified */
                 .truncate(true)
-                .open(&wrq.body().request().filename)
+                .open(wrq.body().request().filename())
             {
                 Ok(f) => f,
                 Err(e) => {
