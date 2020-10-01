@@ -80,9 +80,9 @@ impl fmt::Display for Code {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {
     /// Describes what type of error this is.
-    pub code: Code,
+    code: Code,
     /// The error's message, if any.
-    pub message: String,
+    message: String,
 }
 
 impl Error {
@@ -92,6 +92,16 @@ impl Error {
             code,
             message: message.as_ref().to_string(),
         }
+    }
+
+    /// Returns the error code
+    pub fn code(&self) -> Code {
+        self.code
+    }
+
+    /// Returns the error message
+    pub fn message(&self) -> &str {
+        self.message.as_str()
     }
 }
 

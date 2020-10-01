@@ -144,14 +144,14 @@ impl From<io::Error> for Packet<Error> {
 
 impl From<Packet<Error>> for io::Error {
     fn from(err: Packet<Error>) -> io::Error {
-        let kind = match err.body.code {
+        let kind = match err.body.code() {
             Code::FileNotFound => ErrorKind::NotFound,
             Code::AccessViolation => ErrorKind::PermissionDenied,
             Code::FileAlreadyExists => ErrorKind::AlreadyExists,
             _ => ErrorKind::Other,
         };
 
-        io::Error::new(kind, err.body.message)
+        io::Error::new(kind, err.body.message())
     }
 }
 
