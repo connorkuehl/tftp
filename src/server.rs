@@ -31,34 +31,16 @@ impl Server {
 
     /// Creates a server configured to serve files from a given directory on
     /// a given ip_address and a random port.
-    /// It is attempted to find a free port 16 times before giving up with `AddrInUse`.
     /// On success the chosen port and the new `Server` instance are returned.
-    pub fn new_with_random_port<A: ToSocketAddrs, P: AsRef<Path>>(
-        ip_addr: &str,
+    pub fn random_port<A: AsRef<str>, P: AsRef<Path>>(
+        ip_addr: A,
         serve_from: P,
     ) -> Result<(u16, Self)> {
         let mut rng = rand::thread_rng();
-        for _ in 0..16 {
-            let port: u16 = rng.gen_range(1025, u16::MAX);
-            let bind_to = format!("{}:{}", ip_addr, port);
+        let port: u16 = rng.gen_range(1025, u16::MAX);
+        let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
 
-            // try binding to random port
-            match UdpSocket::bind(bind_to) {
-                // success
-                Ok(socket) => {
-                    let server = Self {
-                        socket,
-                        serve_dir: serve_from.as_ref().to_owned(),
-                    };
-                    return Ok((port, server));
-                }
-                // try again
-                Err(ref e) if e.kind() == io::ErrorKind::AddrInUse => continue,
-                // different error
-                Err(e) => return Err(e),
-            };
-        }
-        Err(io::ErrorKind::AddrInUse.into())
+        Self::new(bind_to, serve_from).map(|server| (port, server))
     }
 
     /// Waits for requests and returns a `Handler` instance.
