@@ -117,9 +117,8 @@ impl Handler {
         if let Direction::Put(wrq) = self.direction {
             let f = match OpenOptions::new()
                 .write(true)
-                .create(true)
+                .create_new(true)
                 /* FIXME: Not sure why this hangs if create is not specified */
-                .truncate(true)
                 .open(wrq.body.0.filename)
             {
                 Ok(f) => f,

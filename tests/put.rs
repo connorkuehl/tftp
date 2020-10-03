@@ -40,3 +40,42 @@ fn test_put() {
 
     server_thread.join().unwrap();
 }
+
+#[test]
+#[should_panic]
+fn test_put_when_already_exists() {
+    let server_addr = "127.0.0.1:6655";
+    let serve_dir = tempfile::tempdir().unwrap();
+
+    let server = Server::new(server_addr, serve_dir.path()).unwrap();
+    let server_thread = thread::spawn(move || {
+        let handler = server.serve().unwrap();
+        handler.handle().unwrap();
+    });
+
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/artifacts/alice-in-wonderland.txt"
+    ));
+
+    let client = client::Builder::new()
+        .unwrap()
+        .connect_to(server_addr)
+        .unwrap()
+        .build();
+
+    client
+        .put("alice-in-wonderland.txt", Mode::NetAscii, &data[..])
+        .unwrap();
+
+    let client = client::Builder::new()
+        .unwrap()
+        .connect_to(server_addr)
+        .unwrap()
+        .build();
+
+    //Second put will return an error since the file already exists.
+    client
+        .put("alice-in-wonderland.txt", Mode::NetAscii, &data[..])
+        .unwrap();
+}
