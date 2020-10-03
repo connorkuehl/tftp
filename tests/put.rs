@@ -77,3 +77,46 @@ fn test_put_sends_error() {
     // When receiving an error packet (due to the broken reader), the server should error out as well
     server_thread.join().unwrap().unwrap_err();
 }
+
+#[test]
+#[should_panic]
+fn test_put_when_already_exists() {
+    let serve_dir = tempfile::tempdir().unwrap();
+
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let server_addr = format!("127.0.0.1:{}", port);
+
+    thread::spawn(move || {
+        let handler = server.serve().unwrap();
+        handler.handle().unwrap();
+
+        let handler = server.serve().unwrap();
+        assert!(handler.handle().is_err());
+    });
+
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/artifacts/alice-in-wonderland.txt"
+    ));
+
+    let client = client::Builder::new()
+        .unwrap()
+        .connect_to(&server_addr)
+        .unwrap()
+        .build();
+
+    client
+        .put("alice-in-wonderland.txt", Mode::NetAscii, &data[..])
+        .unwrap();
+
+    let client = client::Builder::new()
+        .unwrap()
+        .connect_to(&server_addr)
+        .unwrap()
+        .build();
+
+    //Second put will return an error since the file already exists.
+    client
+        .put("alice-in-wonderland.txt", Mode::NetAscii, &data[..])
+        .unwrap();
+}
