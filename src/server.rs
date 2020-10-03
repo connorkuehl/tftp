@@ -43,16 +43,16 @@ impl Server {
         let wrq = Packet::<Wrq>::from_bytes(&buf[..nbytes]);
 
         let direction = if let Ok(rq) = rrq {
-            Some(Direction::Get(rq))
+            Direction::Get(rq)
         } else if let Ok(wq) = wrq {
-            Some(Direction::Put(wq))
+            Direction::Put(wq)
         } else {
-            None
-        };
-
-        let direction = match direction {
-            None => return Err(io::ErrorKind::InvalidInput.into()),
-            Some(d) => d,
+            let error = Packet::error(
+                Code::IllegalOperation,
+                format!("{}", Code::IllegalOperation),
+            );
+            let _ = self.0.send(&error.into_bytes()[..]);
+            return Err(io::ErrorKind::InvalidInput.into());
         };
 
         let mut rng = rand::thread_rng();
