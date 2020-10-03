@@ -6,10 +6,10 @@ use tftp::Server;
 
 #[test]
 fn test_put() {
-    let server_addr = "127.0.0.1:6655";
     let serve_dir = tempfile::tempdir().unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let server_addr = format!("127.0.0.1:{}", port);
 
-    let server = Server::new(server_addr, serve_dir.path()).unwrap();
     let server_thread = thread::spawn(move || {
         let handler = server.serve().unwrap();
         handler.handle().unwrap();

@@ -13,10 +13,11 @@ fn test_get() {
         "/artifacts/alice-in-wonderland.txt"
     ));
 
-    let server_addr = "127.0.0.1:6655";
     let mut serve_dir = REPO_ROOT.to_string();
     serve_dir.push_str("/artifacts");
-    let server = Server::new(server_addr, serve_dir).unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir).unwrap();
+    let server_addr = format!("127.0.0.1:{}", port);
+
     let server_thread = thread::spawn(move || {
         let handler = server.serve().unwrap();
         handler.handle().unwrap();
