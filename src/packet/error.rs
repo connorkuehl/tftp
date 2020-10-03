@@ -38,6 +38,20 @@ impl Code {
             _ => return Err(ErrorKind::InvalidInput.into()),
         })
     }
+
+    /// Converts `Code` into its string representation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Code::NotDefined => "Not defined, see error message (if any)",
+            Code::FileNotFound => "File not found",
+            Code::AccessViolation => "Access violation",
+            Code::DiskFull => "Disk full or allocation exceeded",
+            Code::IllegalOperation => "Illegal TFTP operation",
+            Code::UnknownTid => "Unknown transfer ID",
+            Code::FileAlreadyExists => "File already exists",
+            Code::NoSuchUser => "No such user",
+        }
+    }
 }
 
 impl IntoBytes for Code {
@@ -60,18 +74,7 @@ impl FromBytes for Code {
 
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Code::NotDefined => "Not defined, see error message (if any)",
-            Code::FileNotFound => "File not found",
-            Code::AccessViolation => "Access violation",
-            Code::DiskFull => "Disk full or allocation exceeded",
-            Code::IllegalOperation => "Illegal TFTP operation",
-            Code::UnknownTid => "Unknown transfer ID",
-            Code::FileAlreadyExists => "File already exists",
-            Code::NoSuchUser => "No such user",
-        };
-
-        write!(f, "{}", s)
+        write!(f, "{}", self.as_str())
     }
 }
 
