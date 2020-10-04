@@ -6,10 +6,10 @@ use tftp::Server;
 
 #[test]
 fn test_put() {
-    let server_addr = "127.0.0.1:6655";
     let serve_dir = tempfile::tempdir().unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let server_addr = format!("127.0.0.1:{}", port);
 
-    let server = Server::new(server_addr, serve_dir.path()).unwrap();
     let server_thread = thread::spawn(move || {
         let handler = server.serve().unwrap();
         handler.handle().unwrap();
@@ -44,13 +44,17 @@ fn test_put() {
 #[test]
 #[should_panic]
 fn test_put_when_already_exists() {
-    let server_addr = "127.0.0.1:6655";
     let serve_dir = tempfile::tempdir().unwrap();
 
-    let server = Server::new(server_addr, serve_dir.path()).unwrap();
-    let server_thread = thread::spawn(move || {
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let server_addr = format!("127.0.0.1:{}", port);
+
+    thread::spawn(move || {
         let handler = server.serve().unwrap();
         handler.handle().unwrap();
+
+        let handler = server.serve().unwrap();
+        assert!(handler.handle().is_err());
     });
 
     let data = include_bytes!(concat!(
@@ -60,7 +64,7 @@ fn test_put_when_already_exists() {
 
     let client = client::Builder::new()
         .unwrap()
-        .connect_to(server_addr)
+        .connect_to(&server_addr)
         .unwrap()
         .build();
 
@@ -70,7 +74,7 @@ fn test_put_when_already_exists() {
 
     let client = client::Builder::new()
         .unwrap()
-        .connect_to(server_addr)
+        .connect_to(&server_addr)
         .unwrap()
         .build();
 

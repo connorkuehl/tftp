@@ -1,11 +1,10 @@
 //! A TFTP server. Implementors can use this to build a more richly-featured
 //! server application.
 
-use std::env;
 use std::fs::OpenOptions;
 use std::io::{self, Result};
 use std::net::{ToSocketAddrs, UdpSocket};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rand::Rng;
 
@@ -14,16 +13,34 @@ use crate::connection::Connection;
 use crate::packet::*;
 
 /// A TFTP server.
-pub struct Server(UdpSocket);
+pub struct Server {
+    socket: UdpSocket,
+    serve_dir: PathBuf,
+}
 
 impl Server {
     /// Creates a server configured to serve files from a given directory on
     /// a given address.
     pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(bind_to: A, serve_from: P) -> Result<Self> {
         let socket = UdpSocket::bind(bind_to)?;
-        env::set_current_dir(serve_from)?;
+        Ok(Self {
+            socket,
+            serve_dir: serve_from.as_ref().to_owned(),
+        })
+    }
 
-        Ok(Self(socket))
+    /// Creates a server configured to serve files from a given directory on
+    /// a given ip_address and a random port.
+    /// On success the chosen port and the new `Server` instance are returned.
+    pub fn random_port<A: AsRef<str>, P: AsRef<Path>>(
+        ip_addr: A,
+        serve_from: P,
+    ) -> Result<(u16, Self)> {
+        let mut rng = rand::thread_rng();
+        let port: u16 = rng.gen_range(1025, u16::MAX);
+        let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
+
+        Self::new(bind_to, serve_from).map(|server| (port, server))
     }
 
     /// Waits for requests and returns a `Handler` instance.
@@ -38,29 +55,29 @@ impl Server {
     /* TODO: Maybe return option instead? */
     pub fn serve(&self) -> Result<Handler> {
         let mut buf = [0; MAX_PACKET_SIZE];
-        let (nbytes, src_addr) = self.0.recv_from(&mut buf)?;
+        let (nbytes, src_addr) = self.socket.recv_from(&mut buf)?;
         let rrq = Packet::<Rrq>::from_bytes(&buf[..nbytes]);
         let wrq = Packet::<Wrq>::from_bytes(&buf[..nbytes]);
 
         let direction = if let Ok(rq) = rrq {
-            Some(Direction::Get(rq))
+            Direction::Get(rq)
         } else if let Ok(wq) = wrq {
-            Some(Direction::Put(wq))
+            Direction::Put(wq)
         } else {
-            None
-        };
-
-        let direction = match direction {
-            None => return Err(io::ErrorKind::InvalidInput.into()),
-            Some(d) => d,
+            let error = Packet::error(
+                Code::IllegalOperation,
+                format!("{}", Code::IllegalOperation),
+            );
+            let _ = self.socket.send(&error.into_bytes()[..]);
+            return Err(io::ErrorKind::InvalidInput.into());
         };
 
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(1001, u16::MAX);
-        let addr = self.0.local_addr()?.ip().to_string();
+        let addr = self.socket.local_addr()?.ip().to_string();
         let bind_to = format!("{}:{}", addr, port);
 
-        Handler::new(bind_to, src_addr, direction)
+        Handler::new(bind_to, src_addr, direction, self.serve_dir.clone())
     }
 }
 
@@ -73,6 +90,7 @@ enum Direction {
 pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
+    serve_dir: PathBuf,
 }
 
 impl Handler {
@@ -80,11 +98,16 @@ impl Handler {
         bind: A,
         client: B,
         direction: Direction,
+        serve_dir: PathBuf,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
 
-        Ok(Handler { socket, direction })
+        Ok(Handler {
+            socket,
+            direction,
+            serve_dir,
+        })
     }
 
     /// Completes the handshake with the client and services the request.
@@ -97,7 +120,10 @@ impl Handler {
 
     fn get(self) -> Result<()> {
         if let Direction::Get(rrq) = self.direction {
-            let f = match OpenOptions::new().read(true).open(rrq.body.0.filename) {
+            let f = match OpenOptions::new()
+                .read(true)
+                .open(self.serve_dir.join(rrq.body.0.filename))
+            {
                 Ok(f) => f,
                 Err(e) => {
                     let error: Packet<Error> = e.into();
@@ -119,7 +145,7 @@ impl Handler {
                 .write(true)
                 .create_new(true)
                 /* FIXME: Not sure why this hangs if create is not specified */
-                .open(wrq.body.0.filename)
+                .open(self.serve_dir.join(wrq.body.0.filename))
             {
                 Ok(f) => f,
                 Err(e) => {
