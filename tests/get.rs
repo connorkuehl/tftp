@@ -74,7 +74,6 @@ fn test_get_sends_error() {
     let error = client
         .get("alice-in-wonderland.txt", Mode::NetAscii, ErroneousWriter)
         .unwrap_err();
-
     assert_eq!(error.kind(), io::ErrorKind::Other);
     assert_eq!(format!("{}", error.into_inner().unwrap()), "Fake error");
 
