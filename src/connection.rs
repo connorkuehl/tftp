@@ -31,7 +31,12 @@ impl Connection {
                 Ok(d) => d,
             };
 
-            let _ = writer.write(&data.body.data[..])?;
+            if let Err(err) = writer.write_all(&data.body.data[..]) {
+                let _ = self
+                    .socket
+                    .send(&Packet::error(err.kind().into(), format!("{}", err)).into_bytes()[..]);
+                return Err(err);
+            }
 
             let ack = Packet::ack(data.body.block);
             let _ = self.socket.send(&ack.into_bytes()[..])?;
@@ -50,7 +55,16 @@ impl Connection {
         loop {
             let mut buf = [0; MAX_PAYLOAD_SIZE];
 
-            let bytes_read = reader.read(&mut buf)?;
+            let bytes_read = match reader.read(&mut buf) {
+                Ok(bytes_read) => bytes_read,
+                Err(err) => {
+                    let _ = self.socket.send(
+                        &Packet::error(err.kind().into(), format!("{}", err)).into_bytes()[..],
+                    );
+                    return Err(err);
+                }
+            };
+
             let data = Packet::data(Block::new(current_block), buf[..bytes_read].to_vec());
 
             let _ = self.socket.send(&data.into_bytes()[..])?;

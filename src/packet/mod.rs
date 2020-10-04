@@ -127,17 +127,21 @@ impl Packet<Error> {
     }
 }
 
-impl From<io::Error> for Packet<Error> {
-    fn from(err: io::Error) -> Packet<Error> {
-        let code = match err.kind() {
+impl From<ErrorKind> for Code {
+    fn from(kind: ErrorKind) -> Self {
+        match kind {
             ErrorKind::NotFound => Code::FileNotFound,
             ErrorKind::PermissionDenied => Code::AccessViolation,
             ErrorKind::AlreadyExists => Code::FileAlreadyExists,
             _ => Code::NotDefined,
-        };
+        }
+    }
+}
 
+impl From<io::Error> for Packet<Error> {
+    fn from(err: io::Error) -> Packet<Error> {
+        let code = err.kind().into();
         let message = format!("{}", code);
-
         Packet::error(code, message)
     }
 }

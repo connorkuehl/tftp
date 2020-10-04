@@ -1,4 +1,4 @@
-use std::thread;
+use std::{io, thread};
 
 use tftp::client;
 use tftp::packet::Mode;
@@ -39,4 +39,41 @@ fn test_put() {
     assert_eq!(&bytes[..], &data[..]);
 
     server_thread.join().unwrap();
+}
+
+struct ErroneousReader;
+
+impl io::Read for ErroneousReader {
+    fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+        Err(io::Error::new(io::ErrorKind::Other, format!("Fake error")))
+    }
+}
+
+#[test]
+fn test_put_sends_error() {
+    // Create our server
+    let serve_dir = tempfile::tempdir().unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let server_addr = format!("127.0.0.1:{}", port);
+
+    // Start a thread running its mainloop
+    let server_thread = thread::spawn(move || {
+        let handler = server.serve().unwrap();
+        handler.handle()
+    });
+
+    // Create our client
+    let client = client::Builder::new()
+        .unwrap()
+        .connect_to(server_addr)
+        .unwrap()
+        .build();
+
+    // When trying to create a file with a broken reader, client.put should error out
+    client
+        .put("broken-file.txt", Mode::NetAscii, ErroneousReader)
+        .unwrap_err();
+
+    // When receiving an error packet (due to the broken reader), the server should error out as well
+    server_thread.join().unwrap().unwrap_err();
 }
