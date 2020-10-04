@@ -70,6 +70,16 @@ impl Builder<ConnectTo> {
             socket: self.data.socket,
         }
     }
+
+    /// Creates an instance with a different socket from the origninal instance.
+    pub fn try_clone(&self) -> Result<Self> {
+        let new_sock_builder = Builder::new()?;
+        let data = ConnectTo {
+            server: self.data.server.clone(),
+            socket: new_sock_builder.data.socket,
+        };
+        Ok(Builder { data })
+    }
 }
 
 impl Client {
