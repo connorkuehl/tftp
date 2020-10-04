@@ -10,6 +10,7 @@ use rand::Rng;
 
 use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
+use crate::connection::MIN_PORT_NUMBER;
 use crate::packet::*;
 
 /// A TFTP server.
@@ -37,7 +38,7 @@ impl Server {
         serve_from: P,
     ) -> Result<(u16, Self)> {
         let mut rng = rand::thread_rng();
-        let port: u16 = rng.gen_range(1025, u16::MAX);
+        let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
         let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
 
         Self::new(bind_to, serve_from).map(|server| (port, server))
