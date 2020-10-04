@@ -143,7 +143,7 @@ mod tests {
         assert_eq!(err.into_inner().unwrap().to_string(), "invalid packet");
 
         // Find the first error packet, assuring we skip over the data packet that gets sent in the put test
-        let mut buf = [0; 1048];
+        let mut buf = [0; MAX_PACKET_SIZE];
         let rcvd = loop {
             let (rcvd, _) = server_sock.recv_from(&mut buf).unwrap();
             if let Ok(d) = Packet::<Data>::from_bytes(&buf[..rcvd]) {
