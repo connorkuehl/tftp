@@ -15,6 +15,7 @@ pub use rq::{Rrq, Wrq};
 mod ack;
 mod data;
 mod error;
+pub mod expect;
 mod mode;
 mod opcode;
 mod rq;
