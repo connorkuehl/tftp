@@ -1,7 +1,8 @@
-use std::io::{self, Read, Result, Write};
+use std::io::{Read, Result, Write};
 use std::net::UdpSocket;
 
-use crate::bytes::{FromBytes, IntoBytes};
+use crate::bytes::IntoBytes;
+use crate::packet::expect::ExpectPacket;
 use crate::packet::*;
 
 /*
@@ -23,26 +24,7 @@ impl Connection {
             let mut buf = [0; MAX_PACKET_SIZE];
             let bytes_recvd = self.socket.recv(&mut buf)?;
 
-            let data = match Packet::<Data>::from_bytes(&buf[..bytes_recvd]) {
-                Ok(d) => d,
-
-                Err(_) => {
-                    let error = match Packet::<Error>::from_bytes(&buf[..bytes_recvd]) {
-                        Ok(err) => err,
-                        Err(_) => {
-                            let _ = self.socket.send(
-                                &Packet::error(Code::NotDefined, "invalid packet").into_bytes()[..],
-                            );
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "invalid packet",
-                            ));
-                        }
-                    };
-
-                    return Err(io::Error::from(error));
-                }
-            };
+            let data: Packet<Data> = self.socket.expect_packet(&buf[..bytes_recvd])?;
 
             let _ = writer.write(&data.body.data[..])?;
 
@@ -71,25 +53,7 @@ impl Connection {
             let mut buf = [0; MAX_PACKET_SIZE];
             let bytes_recvd = self.socket.recv(&mut buf)?;
 
-            let ack = match Packet::<Ack>::from_bytes(&buf[..bytes_recvd]) {
-                Err(_) => {
-                    let error = match Packet::<Error>::from_bytes(&buf[..bytes_recvd]) {
-                        Ok(err) => err,
-                        Err(_) => {
-                            let _ = self.socket.send(
-                                &Packet::error(Code::NotDefined, "invalid packet").into_bytes()[..],
-                            );
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "invalid packet",
-                            ));
-                        }
-                    };
-
-                    return Err(io::Error::from(error));
-                }
-                Ok(a) => a,
-            };
+            let ack: Packet<Ack> = self.socket.expect_packet(&buf[..bytes_recvd])?;
 
             assert_eq!(Block::new(current_block), ack.body.block);
             current_block += 1;
@@ -105,9 +69,13 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use rand::Rng;
 
     use super::*;
+    use crate::bytes::FromBytes;
+    use crate::packet::{Code, Error};
 
     fn test_blank_sends_invalid_packet_error<T, F>(f: F)
     where
@@ -137,27 +105,24 @@ mod tests {
 
         // Assert that, when trying to <blank>, we get an invalid packet error
         // let err = client_conn.get(&mut Vec::new()).unwrap_err();
-        let err = f(client_conn).unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
-        assert_eq!(err.into_inner().unwrap().to_string(), "invalid packet");
+        let actual = f(client_conn).unwrap_err();
+        let expected: io::Error =
+            Packet::error(Code::IllegalOperation, Code::IllegalOperation.as_str()).into();
+        assert_eq!(actual.kind(), expected.kind());
 
         // Find the first error packet, assuring we skip over the data packet that gets sent in the put test
         let mut buf = [0; MAX_PACKET_SIZE];
         let rcvd = loop {
             let (rcvd, _) = server_sock.recv_from(&mut buf).unwrap();
-            if let Ok(d) = Packet::<Data>::from_bytes(&buf[..rcvd]) {
+            if let Ok(_) = Packet::<Data>::from_bytes(&buf[..rcvd]) {
                 continue;
             }
             break rcvd;
         };
 
         // Assert that we get an "invalid packet" error packet
-        let packet_err: io::Error = Packet::<Error>::from_bytes(&buf[..rcvd]).unwrap().into();
-        assert_eq!(packet_err.kind(), io::ErrorKind::Other);
-        assert_eq!(
-            packet_err.into_inner().unwrap().to_string(),
-            "invalid packet"
-        );
+        let actual: io::Error = Packet::<Error>::from_bytes(&buf[..rcvd]).unwrap().into();
+        assert_eq!(actual.kind(), expected.kind());
     }
 
     #[test]
