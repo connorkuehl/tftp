@@ -126,7 +126,7 @@ mod tests {
 
         // Connect them together
         client_sock.connect(("localhost", server_port)).unwrap();
-        server_sock.connect(("localhost", client_port)).unwrap();
+        // server_sock.connect(("localhost", client_port)).unwrap();
 
         // Create a connection struct for our client
         let client_conn = Connection::new(client_sock);
