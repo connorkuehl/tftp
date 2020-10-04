@@ -14,7 +14,7 @@ pub enum Mode {
     /// Deprecated.
     Mail,
 
-    /// 7-bit ASCII.
+    /// 8-bit ASCII.
     NetAscii,
 
     /// 8-bit binary.
