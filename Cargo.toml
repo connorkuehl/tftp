@@ -15,3 +15,15 @@ rand = "0.7.3"
 
 [dev-dependencies]
 tempfile = "3.1.0"
+
+[[example]]
+name = "client"
+path = "examples/client.rs"
+
+[[example]]
+name = "server"
+path = "examples/server.rs"
+
+[[example]]
+name = "server_with_threads"
+path = "examples/server_with_threads.rs"
