@@ -1,5 +1,8 @@
-use std::io::{self, Read, Result, Write};
 use std::net::UdpSocket;
+use std::{
+    io::{self, Read, Result, Write},
+    time::Duration,
+};
 
 use crate::bytes::IntoBytes;
 use crate::packet::expect::ExpectPacket;
@@ -35,11 +38,24 @@ impl Connection {
 
             let payload_size = data.body.data.len();
             let ack = Packet::<Ack>::from(data);
-            let _ = self.socket.send(&ack.into_bytes()[..])?;
 
             if payload_size < MAX_PAYLOAD_SIZE {
+                loop {
+                    let _ = self.socket.send(&ack.clone().into_bytes()[..])?;
+
+                    self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
+                    if let Err(err) = self.socket.recv(&mut buf) {
+                        match err.kind() {
+                            io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
+                                break;
+                            }
+                            _ => return Err(err),
+                        }
+                    };
+                }
                 break;
             }
+            let _ = self.socket.send(&ack.into_bytes()[..])?;
         }
 
         Ok(writer)
