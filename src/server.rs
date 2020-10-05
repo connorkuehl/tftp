@@ -5,6 +5,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Result};
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use rand::Rng;
 
@@ -17,16 +18,22 @@ use crate::packet::*;
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
+    packet_timeout: Option<Duration>,
 }
 
 impl Server {
     /// Creates a server configured to serve files from a given directory on
     /// a given address.
-    pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(bind_to: A, serve_from: P) -> Result<Self> {
+    pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(
+        bind_to: A,
+        serve_from: P,
+        packet_timeout: Option<Duration>,
+    ) -> Result<Self> {
         let socket = UdpSocket::bind(bind_to)?;
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
+            packet_timeout,
         })
     }
 
@@ -36,12 +43,13 @@ impl Server {
     pub fn random_port<A: AsRef<str>, P: AsRef<Path>>(
         ip_addr: A,
         serve_from: P,
+        packet_timeout: Option<Duration>,
     ) -> Result<(u16, Self)> {
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
         let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
 
-        Self::new(bind_to, serve_from).map(|server| (port, server))
+        Self::new(bind_to, serve_from, packet_timeout).map(|server| (port, server))
     }
 
     /// Waits for requests and returns a `Handler` instance.
@@ -78,7 +86,13 @@ impl Server {
         let addr = self.socket.local_addr()?.ip().to_string();
         let bind_to = format!("{}:{}", addr, port);
 
-        Handler::new(bind_to, src_addr, direction, self.serve_dir.clone())
+        Handler::new(
+            bind_to,
+            src_addr,
+            direction,
+            self.serve_dir.clone(),
+            self.packet_timeout,
+        )
     }
 }
 
@@ -100,9 +114,11 @@ impl Handler {
         client: B,
         direction: Direction,
         serve_dir: PathBuf,
+        packet_timeout: Option<Duration>,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
+        socket.set_read_timeout(packet_timeout)?;
 
         Ok(Handler {
             socket,

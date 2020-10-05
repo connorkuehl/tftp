@@ -4,6 +4,7 @@
 use std::io::{self, Read, Result, Write};
 use std::iter::Iterator;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use std::time::Duration;
 
 use rand::Rng;
 
@@ -15,6 +16,7 @@ use crate::packet::*;
 /// The initial state for building a `Client`.
 pub struct New {
     socket: UdpSocket,
+    packet_timeout: Option<Duration>,
 }
 
 /// An intermediate state for building a `Client`.Builder
@@ -24,6 +26,7 @@ pub struct New {
 pub struct ConnectTo {
     server: Vec<SocketAddr>,
     socket: UdpSocket,
+    packet_timeout: Option<Duration>,
 }
 
 /// Builds a `Client`.
@@ -40,13 +43,17 @@ pub struct Client {
 impl Builder<New> {
     /// Generates a Transfer ID (a bind address & port) and opens a `UdpSocket`
     /// for this connection.
-    pub fn new() -> Result<Self> {
+    pub fn new(packet_timeout: Option<Duration>) -> Result<Self> {
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
         let bind_to = format!("0.0.0.0:{}", port);
         let socket = UdpSocket::bind(bind_to)?;
+        socket.set_read_timeout(packet_timeout)?;
 
-        let data = New { socket };
+        let data = New {
+            socket,
+            packet_timeout,
+        };
 
         Ok(Builder { data })
     }
@@ -57,6 +64,7 @@ impl Builder<New> {
         let data = ConnectTo {
             server: resolved,
             socket: self.data.socket,
+            packet_timeout: self.data.packet_timeout,
         };
 
         Ok(Builder { data })
@@ -74,10 +82,11 @@ impl Builder<ConnectTo> {
 
     /// Creates an instance with a different socket from the origninal instance.
     pub fn try_clone(&self) -> Result<Self> {
-        let new_sock_builder = Builder::new()?;
+        let new_sock_builder = Builder::new(self.data.packet_timeout)?;
         let data = ConnectTo {
             server: self.data.server.clone(),
             socket: new_sock_builder.data.socket,
+            packet_timeout: self.data.packet_timeout,
         };
         Ok(Builder { data })
     }

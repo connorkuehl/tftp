@@ -7,7 +7,7 @@ use tftp::Server;
 #[test]
 fn test_put() {
     let serve_dir = tempfile::tempdir().unwrap();
-    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path(), None).unwrap();
     let server_addr = format!("127.0.0.1:{}", port);
 
     let server_thread = thread::spawn(move || {
@@ -20,7 +20,7 @@ fn test_put() {
         "/artifacts/alice-in-wonderland.txt"
     ));
 
-    let client = client::Builder::new()
+    let client = client::Builder::new(None)
         .unwrap()
         .connect_to(server_addr)
         .unwrap()
@@ -53,7 +53,7 @@ impl io::Read for ErroneousReader {
 fn test_put_sends_error() {
     // Create our server
     let serve_dir = tempfile::tempdir().unwrap();
-    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path(), None).unwrap();
     let server_addr = format!("127.0.0.1:{}", port);
 
     // Start a thread running its mainloop
@@ -63,7 +63,7 @@ fn test_put_sends_error() {
     });
 
     // Create our client
-    let client = client::Builder::new()
+    let client = client::Builder::new(None)
         .unwrap()
         .connect_to(server_addr)
         .unwrap()
@@ -83,7 +83,7 @@ fn test_put_sends_error() {
 fn test_put_when_already_exists() {
     let serve_dir = tempfile::tempdir().unwrap();
 
-    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path()).unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir.path(), None).unwrap();
     let server_addr = format!("127.0.0.1:{}", port);
 
     thread::spawn(move || {
@@ -99,7 +99,7 @@ fn test_put_when_already_exists() {
         "/artifacts/alice-in-wonderland.txt"
     ));
 
-    let client = client::Builder::new()
+    let client = client::Builder::new(None)
         .unwrap()
         .connect_to(&server_addr)
         .unwrap()
@@ -109,7 +109,7 @@ fn test_put_when_already_exists() {
         .put("alice-in-wonderland.txt", Mode::NetAscii, &data[..])
         .unwrap();
 
-    let client = client::Builder::new()
+    let client = client::Builder::new(None)
         .unwrap()
         .connect_to(&server_addr)
         .unwrap()
