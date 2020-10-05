@@ -69,7 +69,14 @@ impl Connection {
 
             let ack: Packet<Ack> = self.socket.expect_packet(&buf[..bytes_recvd])?;
 
-            assert_eq!(Block::new(current_block), ack.body.block);
+            if Block::new(current_block) != ack.body.block {
+                let error = Packet::<Error>::error(
+                    Code::IllegalOperation,
+                    "Got an ack with the wrong packet number, terminate excecution",
+                );
+                self.socket.send(&error.clone().into_bytes()[..])?;
+                return Err(io::Error::from(error));
+            }
             current_block += 1;
 
             if bytes_read < MAX_PAYLOAD_SIZE {
