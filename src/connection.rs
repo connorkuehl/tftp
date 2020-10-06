@@ -1,4 +1,4 @@
-use std::io::{Read, Result, Write};
+use std::io::{self, Read, Result, Write};
 use std::net::UdpSocket;
 
 use crate::bytes::IntoBytes;
