@@ -70,9 +70,12 @@ impl Connection {
             let ack: Packet<Ack> = self.socket.expect_packet(&buf[..bytes_recvd])?;
 
             if Block::new(current_block) != ack.body.block {
-                let error = Packet::<Error>::error(
+                let error = Packet::error(
                     Code::IllegalOperation,
-                    "Got an ack with the wrong packet number, terminate excecution",
+                    format!(
+                        "expected ACK for {:?} but got ACK for {:?}",
+                        current_block, ack.body.block
+                    ),
                 );
                 self.socket.send(&error.clone().into_bytes()[..])?;
                 return Err(io::Error::from(error));
