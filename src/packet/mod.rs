@@ -128,6 +128,14 @@ impl Packet<Error> {
     }
 }
 
+impl From<Packet<Data>> for Packet<Ack> {
+    /// Create an `Ack` packet to acknowledge receipt of
+    /// a specific `Data` packet setting the correct `Block` number.
+    fn from(packet: Packet<Data>) -> Packet<Ack> {
+        Packet::ack(packet.body.block)
+    }
+}
+
 impl From<ErrorKind> for Code {
     fn from(kind: ErrorKind) -> Self {
         match kind {
@@ -281,5 +289,13 @@ mod tests {
         let expected = Packet::error(Code::FileNotFound, "file not found");
         let actual = Packet::<Error>::from_bytes(&bytes[..]).unwrap();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_ack_from_data() {
+        let block_number = 129;
+        let data_packet = Packet::data(Block(block_number), vec![]);
+        let ack_packet = Packet::<Ack>::from(data_packet);
+        assert_eq!(ack_packet.body.block, Block(block_number));
     }
 }
