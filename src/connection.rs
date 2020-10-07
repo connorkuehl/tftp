@@ -26,6 +26,36 @@ impl Connection {
         }
     }
 
+    fn check_retransmission(
+        &self,
+        error: io::Error,
+        current_retransmissions: &mut usize,
+    ) -> Result<()> {
+        // Check that this is a timeout error
+        if !matches!(
+            error.kind(),
+            io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+        ) {
+            return Err(error);
+        }
+
+        // Check that we're under the max amount of retransmissions
+        *current_retransmissions += 1;
+        if let Some(max_retransmissions) = self.max_retransmissions {
+            if *current_retransmissions > max_retransmissions {
+                let _ =
+                    self.socket.send(
+                        &Packet::error(Code::NotDefined, "exceeded max retransmissions")
+                            .into_bytes()[..],
+                    );
+
+                return Err(error);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn get<W: Write>(self, mut writer: W) -> Result<W> {
         let mut last_block = None;
         let mut current_retransmissions = 0;
@@ -36,36 +66,25 @@ impl Connection {
             let bytes_recvd = loop {
                 match self.socket.recv(&mut buf) {
                     Ok(bytes_recvd) => break bytes_recvd,
-                    Err(error) => match error.kind() {
-                        // If we time out, let's assume our last packet got dropped
-                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
-                            // If we just sent an ACK, let's resend it (if we've not exceeded our limit)
-                            if let Some(last_block) = last_block {
-                                if let Some(max_retransmissions) = self.max_retransmissions {
-                                    current_retransmissions += 1;
-                                    if current_retransmissions > max_retransmissions {
-                                        let _ = self.socket.send(
-                                            &Packet::error(
-                                                Code::NotDefined,
-                                                "exceeded max retransmissions",
-                                            )
-                                            .into_bytes()[..],
-                                        );
 
-                                        return Err(error);
-                                    }
-                                }
+                    // If we get an error, we either need to retransmit the last packet or bail
+                    Err(error) => {
+                        // If we've sent an ACK before, then we can move forward
+                        // with the retransmission check
+                        if let Some(last_block) = last_block {
+                            // Check if we should retransmit the current packet
+                            self.check_retransmission(error, &mut current_retransmissions)?;
 
-                                let ack = Packet::ack(last_block);
-                                self.socket.send(&ack.into_bytes()[..])?;
-                            } else {
-                                // FIXME: resend the read request?
-                                return Err(error);
-                            }
+                            // If so, do so and continue through the loop
+                            let ack = Packet::ack(last_block);
+                            self.socket.send(&ack.into_bytes()[..])?;
+                        } else {
+                            // Otherwise, we've nothing to retransmit and shall
+                            // just return the error. We could either wait here
+                            // or retransmit the read request, but that's a FIXME.
+                            return Err(error);
                         }
-
-                        _ => return Err(error),
-                    },
+                    }
                 }
             };
 
@@ -131,30 +150,12 @@ impl Connection {
                 match self.socket.recv(&mut buf) {
                     Ok(bytes_recvd) => break self.socket.expect_packet(&buf[..bytes_recvd])?,
 
-                    Err(error) => match error.kind() {
-                        // If we time out, let's assume our last packet got dropped
-                        // and retransmit it by running through the loop again (if we've not exceeded our limit)
-                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
-                            if let Some(max_retransmissions) = self.max_retransmissions {
-                                current_retransmissions += 1;
-                                if current_retransmissions > max_retransmissions {
-                                    let _ = self.socket.send(
-                                        &Packet::error(
-                                            Code::NotDefined,
-                                            "exceeded max retransmissions",
-                                        )
-                                        .into_bytes()[..],
-                                    );
-
-                                    return Err(error);
-                                }
-                            }
-
-                            continue;
-                        }
-
-                        _ => return Err(error),
-                    },
+                    // If we get an error, we either need to retransmit the last packet or bail
+                    Err(error) => {
+                        // Check if we should retransmit the current packet
+                        self.check_retransmission(error, &mut current_retransmissions)?;
+                        // If so, do so by running through the loop again
+                    }
                 }
             };
 
