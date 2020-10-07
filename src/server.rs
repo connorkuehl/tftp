@@ -5,7 +5,6 @@ use std::fs::OpenOptions;
 use std::io::{self, Result};
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use rand::Rng;
 
@@ -13,12 +12,13 @@ use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
 use crate::connection::MIN_PORT_NUMBER;
 use crate::packet::*;
+use crate::RetransmissionConfig;
 
 /// A TFTP server.
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
-    packet_timeout: Option<Duration>,
+    retransmission_config: Option<RetransmissionConfig>,
 }
 
 impl Server {
@@ -27,13 +27,13 @@ impl Server {
     pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(
         bind_to: A,
         serve_from: P,
-        packet_timeout: Option<Duration>,
+        retransmission_config: Option<RetransmissionConfig>,
     ) -> Result<Self> {
         let socket = UdpSocket::bind(bind_to)?;
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
-            packet_timeout,
+            retransmission_config,
         })
     }
 
@@ -43,13 +43,13 @@ impl Server {
     pub fn random_port<A: AsRef<str>, P: AsRef<Path>>(
         ip_addr: A,
         serve_from: P,
-        packet_timeout: Option<Duration>,
+        retransmission_config: Option<RetransmissionConfig>,
     ) -> Result<(u16, Self)> {
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
         let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
 
-        Self::new(bind_to, serve_from, packet_timeout).map(|server| (port, server))
+        Self::new(bind_to, serve_from, retransmission_config).map(|server| (port, server))
     }
 
     /// Waits for requests and returns a `Handler` instance.
@@ -91,7 +91,7 @@ impl Server {
             src_addr,
             direction,
             self.serve_dir.clone(),
-            self.packet_timeout,
+            self.retransmission_config,
         )
     }
 }
@@ -106,6 +106,8 @@ pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
+
+    retransmission_config: Option<RetransmissionConfig>,
 }
 
 impl Handler {
@@ -114,16 +116,17 @@ impl Handler {
         client: B,
         direction: Direction,
         serve_dir: PathBuf,
-        packet_timeout: Option<Duration>,
+        retransmission_config: Option<RetransmissionConfig>,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
-        socket.set_read_timeout(packet_timeout)?;
+        socket.set_read_timeout(retransmission_config.map(|conf| conf.timeout))?;
 
         Ok(Handler {
             socket,
             direction,
             serve_dir,
+            retransmission_config,
         })
     }
 
@@ -148,7 +151,11 @@ impl Handler {
                     return Err(io::Error::from(error));
                 }
             };
-            let conn = Connection::new(self.socket);
+            let conn = Connection::new(
+                self.socket,
+                self.retransmission_config
+                    .and_then(|conf| conf.max_retransmissions),
+            );
             conn.put(f)?;
             Ok(())
         } else {
@@ -174,7 +181,7 @@ impl Handler {
             let ack = Packet::ack(Block::new(0));
             let _ = self.socket.send(&ack.into_bytes()[..])?;
 
-            let conn = Connection::new(self.socket);
+            let conn = Connection::new(self.socket, None);
             conn.get(f)?;
             Ok(())
         } else {

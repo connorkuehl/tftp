@@ -12,18 +12,23 @@ pub const MIN_PORT_NUMBER: u16 = 1001;
 
 pub struct Connection {
     socket: UdpSocket,
+    max_retransmissions: Option<usize>,
 }
 
 impl Connection {
     /// Create a new Connection
     ///
     /// It is assumed that the socket is already connected and already has a read/write timeout set
-    pub fn new(socket: UdpSocket) -> Self {
-        Self { socket }
+    pub fn new(socket: UdpSocket, max_retransmissions: Option<usize>) -> Self {
+        Self {
+            socket,
+            max_retransmissions,
+        }
     }
 
     pub fn get<W: Write>(self, mut writer: W) -> Result<W> {
         let mut last_block = None;
+        let mut current_retransmissions = 0;
 
         loop {
             // Try to get a packet
@@ -34,8 +39,23 @@ impl Connection {
                     Err(error) => match error.kind() {
                         // If we time out, let's assume our last packet got dropped
                         io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
-                            // If we just sent an ACK, let's resend it
+                            // If we just sent an ACK, let's resend it (if we've not exceeded our limit)
                             if let Some(last_block) = last_block {
+                                if let Some(max_retransmissions) = self.max_retransmissions {
+                                    current_retransmissions += 1;
+                                    if current_retransmissions > max_retransmissions {
+                                        let _ = self.socket.send(
+                                            &Packet::error(
+                                                Code::NotDefined,
+                                                "exceeded max retransmissions",
+                                            )
+                                            .into_bytes()[..],
+                                        );
+
+                                        return Err(error);
+                                    }
+                                }
+
                                 let ack = Packet::ack(last_block);
                                 self.socket.send(&ack.into_bytes()[..])?;
                             } else {
@@ -66,6 +86,7 @@ impl Connection {
             let ack = Packet::ack(data.body.block);
             self.socket.send(&ack.into_bytes()[..])?;
             last_block = Some(data.body.block);
+            current_retransmissions = 0;
 
             // If the data payload length is less than the maximum, then this is the last block
             if data.body.data.len() < MAX_PAYLOAD_SIZE {
@@ -82,6 +103,7 @@ impl Connection {
 
     pub fn put<R: Read>(self, mut reader: R) -> Result<()> {
         let mut current_block = 1;
+        let mut current_retransmissions = 0;
 
         loop {
             // Read a block from our reader
@@ -111,8 +133,23 @@ impl Connection {
 
                     Err(error) => match error.kind() {
                         // If we time out, let's assume our last packet got dropped
-                        // and retransmit it by running through the loop again
+                        // and retransmit it by running through the loop again (if we've not exceeded our limit)
                         io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
+                            if let Some(max_retransmissions) = self.max_retransmissions {
+                                current_retransmissions += 1;
+                                if current_retransmissions > max_retransmissions {
+                                    let _ = self.socket.send(
+                                        &Packet::error(
+                                            Code::NotDefined,
+                                            "exceeded max retransmissions",
+                                        )
+                                        .into_bytes()[..],
+                                    );
+
+                                    return Err(error);
+                                }
+                            }
+
                             continue;
                         }
 
@@ -135,6 +172,7 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
     use std::io;
     use std::time::Duration;
 
@@ -145,8 +183,9 @@ mod tests {
     use crate::packet::{Code, Error};
 
     const TIMEOUT: Duration = Duration::from_secs(3);
+    const MAX_RETRANSMISSIONS: usize = 3;
 
-    fn create_server_client() -> (UdpSocket, Connection) {
+    fn create_server_client(max_retransmissions: Option<usize>) -> (UdpSocket, Connection) {
         // Create our server socket
         let server_port: u16 = rand::thread_rng().gen_range(MIN_PORT_NUMBER, u16::MAX);
         let server_sock = UdpSocket::bind(("localhost", server_port)).unwrap();
@@ -160,7 +199,7 @@ mod tests {
         server_sock.connect(("localhost", client_port)).unwrap();
 
         // Create a connection struct for our client
-        let client_conn = Connection::new(client_sock);
+        let client_conn = Connection::new(client_sock, max_retransmissions);
 
         (server_sock, client_conn)
     }
@@ -173,7 +212,7 @@ mod tests {
         const INVALID_PACKET: &[u8] = b"this is an invalid packet. hopefully.";
 
         // Create our server/client pair
-        let (server_sock, client_conn) = create_server_client();
+        let (server_sock, client_conn) = create_server_client(None);
 
         // Send an (hopefully) invalid packet to the client
         server_sock.send(INVALID_PACKET).unwrap();
@@ -213,7 +252,7 @@ mod tests {
     #[test]
     fn test_get_retransmits_ack() {
         // Create our server/client pair
-        let (server_sock, client_conn) = create_server_client();
+        let (server_sock, client_conn) = create_server_client(None);
         client_conn.socket.set_read_timeout(Some(TIMEOUT)).unwrap();
 
         // Send the client off into its own little space
@@ -259,7 +298,7 @@ mod tests {
         const BOGUS_DATA: &[u8] = b"hey, look, listen";
 
         // Create our server/client pair
-        let (server_sock, client_conn) = create_server_client();
+        let (server_sock, client_conn) = create_server_client(None);
         client_conn.socket.set_read_timeout(Some(TIMEOUT)).unwrap();
 
         // Send the client off into its own little space to execute their fictitous write request
@@ -286,5 +325,86 @@ mod tests {
 
         // Then make sure our client exited successfully
         client_thread.join().unwrap().unwrap();
+    }
+
+    #[test]
+    fn test_get_gives_up_after_n_retransmissions() {
+        // Create our server/client pair
+        let (server_sock, client_conn) = create_server_client(Some(MAX_RETRANSMISSIONS));
+        client_conn.socket.set_read_timeout(Some(TIMEOUT)).unwrap();
+
+        // Send the client off into its own little space
+        let client_thread = std::thread::spawn(move || client_conn.get(Vec::new()));
+
+        // Pretend the client's sent a read request
+
+        // Let's send our first data packet, making sure it's not a terminator
+        server_sock
+            .send(&Packet::data(Block::new(1), &[b'h'; MAX_PAYLOAD_SIZE][..]).into_bytes()[..])
+            .unwrap();
+
+        // Let's now sleep for long enough that the client'll surely retransmit more than its maximum
+        std::thread::sleep(TIMEOUT * u32::try_from(MAX_RETRANSMISSIONS + 1).unwrap());
+
+        // Now, we'll expect to have gotten the one original ACK packet and the n other retransmissions
+        let mut prev: Option<Packet<Ack>> = None;
+        for _ in 0..(MAX_RETRANSMISSIONS + 1) {
+            let mut buf = [0; MAX_PACKET_SIZE];
+            let recvd = server_sock.recv(&mut buf).unwrap();
+            let packet: Packet<Ack> = server_sock.expect_packet(&buf[..recvd]).unwrap();
+
+            match prev {
+                Some(ref prev) => assert_eq!(prev.body.block, packet.body.block),
+                None => prev = Some(packet),
+            }
+        }
+
+        // Then we're expecting an error
+        let mut buf = [0; MAX_PACKET_SIZE];
+        let recvd = server_sock.recv(&mut buf).unwrap();
+        let _packet: Packet<Error> = server_sock.expect_packet(&buf[..recvd]).unwrap();
+
+        // We'll also expect to not have any other datagrams
+        server_sock.set_nonblocking(true).unwrap();
+        server_sock.recv(&mut [0; MAX_PACKET_SIZE]).unwrap_err();
+
+        client_thread.join().unwrap().unwrap_err();
+    }
+
+    #[test]
+    fn test_put_gives_up_after_n_retransmissions() {
+        const BOGUS_DATA: &[u8] = b"hey, look, listen";
+
+        // Create our server/client pair
+        let (server_sock, client_conn) = create_server_client(Some(MAX_RETRANSMISSIONS));
+        client_conn.socket.set_read_timeout(Some(TIMEOUT)).unwrap();
+
+        // Send the client off into its own little space to execute their fictitous write request
+        let client_thread = std::thread::spawn(move || client_conn.put(BOGUS_DATA));
+
+        // Send the client off into its own little space to execute their fictitous write request
+        std::thread::sleep(TIMEOUT * u32::try_from(MAX_RETRANSMISSIONS + 1).unwrap());
+
+        // Now, we'll expect to have gotten the one original DATA packet and the n other retransmissions
+        for _ in 0..(MAX_RETRANSMISSIONS + 1) {
+            let mut buf = [0; MAX_PACKET_SIZE];
+            let recvd = server_sock.recv(&mut buf).unwrap();
+            let packet: Packet<Data> = server_sock.expect_packet(&buf[..recvd]).unwrap();
+
+            assert_eq!(packet.body.block, Block::new(1));
+            assert_eq!(packet.body.data, BOGUS_DATA);
+        }
+
+        // Then we're expecting an error
+        let mut buf = [0; MAX_PACKET_SIZE];
+        let recvd = server_sock.recv(&mut buf).unwrap();
+        let _packet: Packet<Error> = server_sock.expect_packet(&buf[..recvd]).unwrap();
+
+        // We'll also expect to not have any other datagrams
+        server_sock.set_nonblocking(true).unwrap();
+        server_sock.recv(&mut [0; MAX_PACKET_SIZE]).unwrap_err();
+
+        // We'll expect our client to exit unsuccesfully
+        client_thread.join().unwrap().unwrap_err();
     }
 }

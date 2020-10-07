@@ -39,6 +39,23 @@
 
 #![deny(missing_docs)]
 
+/// POD struct representing the configuration of the retransmission of packets
+// NB: this is a struct so that you can only specify max_retransmissions if you specify a time :>
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct RetransmissionConfig {
+    /// How long should we wait for a reply before retransmitting the last packet?
+    timeout: std::time::Duration,
+
+    /// How many times should we retransmit the last packet?
+    ///
+    /// Note that this is the number of *retransmissions*, not transmissions, so
+    /// this means that setting this to `Some(0)` means that the packet will still be
+    /// sent once.
+    ///
+    /// If this is set to `None`, the packet will be retransmitted indefinitely.
+    max_retransmissions: Option<usize>,
+}
+
 mod bytes;
 pub mod client;
 mod connection;
