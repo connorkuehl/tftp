@@ -203,7 +203,6 @@ impl Handler {
     }
 }
 
-
 // These tests use hand-rolled partial client implmentations mostly copied from the proper implementation at client.rs.
 // This is because we need to simulate incorrect client behaviors, and the public client api won't let us do that.
 #[cfg(test)]
