@@ -3,10 +3,13 @@
 
 use std::fs::OpenOptions;
 use std::io::{self, Result};
-use std::net::{ToSocketAddrs, UdpSocket};
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::path::{Path, PathBuf};
 
 use rand::Rng;
+use std::collections::HashSet;
+
+use std::sync::{Arc, Mutex};
 
 use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
@@ -17,7 +20,11 @@ use crate::packet::*;
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
+    active_clients: Arc<Mutex<HashSet<SocketAddr>>>,
 }
+
+// Callback function type alias
+type Callback = Option<Box<dyn FnOnce() + Send>>;
 
 impl Server {
     /// Creates a server configured to serve files from a given directory on
@@ -27,6 +34,7 @@ impl Server {
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
+            active_clients: Arc::new(Mutex::new(HashSet::new())),
         })
     }
 
@@ -60,6 +68,14 @@ impl Server {
         let rrq = Packet::<Rrq>::from_bytes(&buf[..nbytes]);
         let wrq = Packet::<Wrq>::from_bytes(&buf[..nbytes]);
 
+        if !self.active_clients.lock().unwrap().insert(src_addr) {
+            // The src_addr is already in the set.
+            return Err(io::Error::new(
+                io::ErrorKind::AddrNotAvailable,
+                "Client TID already connected.",
+            ));
+        }
+
         let direction = if let Ok(rq) = rrq {
             Direction::Get(rq)
         } else if let Ok(wq) = wrq {
@@ -78,7 +94,18 @@ impl Server {
         let addr = self.socket.local_addr()?.ip().to_string();
         let bind_to = format!("{}:{}", addr, port);
 
-        Handler::new(bind_to, src_addr, direction, self.serve_dir.clone())
+        let active_clients = Arc::clone(&self.active_clients);
+        let callback: Callback = Some(Box::new(move || {
+            active_clients.lock().unwrap().remove(&src_addr);
+        }));
+
+        Handler::new(
+            bind_to,
+            src_addr,
+            direction,
+            self.serve_dir.clone(),
+            callback,
+        )
     }
 }
 
@@ -92,6 +119,7 @@ pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
+    callback: Callback,
 }
 
 impl Handler {
@@ -100,6 +128,7 @@ impl Handler {
         client: B,
         direction: Direction,
         serve_dir: PathBuf,
+        callback: Callback,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
@@ -108,15 +137,22 @@ impl Handler {
             socket,
             direction,
             serve_dir,
+            callback,
         })
     }
 
     /// Completes the handshake with the client and services the request.
-    pub fn handle(self) -> Result<()> {
-        match self.direction {
+    pub fn handle(mut self) -> Result<()> {
+        let callback = match self.callback.take() {
+            Some(l) => l,
+            None => Box::new(|| {}),
+        };
+        let result = match self.direction {
             Direction::Get(_) => self.get(),
             Direction::Put(_) => self.put(),
-        }
+        };
+        callback();
+        result
     }
 
     fn get(self) -> Result<()> {
