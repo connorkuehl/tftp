@@ -202,3 +202,193 @@ impl Handler {
         }
     }
 }
+
+
+// These tests use hand-rolled partial client implmentations mostly copied from the proper implementation at client.rs.
+// This is because we need to simulate incorrect client behaviors, and the public client api won't let us do that.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_simple_use() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+
+        let server_addr = "127.0.0.1:62186";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            let h = server.serve().unwrap();
+            h.handle().unwrap();
+        });
+
+        let bind_to = format!("0.0.0.0:62187");
+        let socket = UdpSocket::bind(bind_to).unwrap();
+        let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+        socket
+            .send_to(&rrq.clone().into_bytes(), server_addr)
+            .unwrap();
+
+        let mut buf = [0; MAX_PACKET_SIZE];
+        let (_, server) = socket.peek_from(&mut buf).unwrap();
+        socket.connect(server).unwrap();
+
+        let conn = Connection::new(socket);
+
+        let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+        let res = conn.get(res).unwrap();
+
+        assert_eq!(&exemplar[..], &res[..]);
+
+        server_thread.join().unwrap();
+    }
+    #[test]
+    fn test_reuse_socket() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+
+        let server_addr = "127.0.0.1:62188";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            for _ in 0..3 {
+                let h = server.serve().unwrap();
+                h.handle().unwrap();
+            }
+        });
+        for _ in 0..3 {
+            let bind_to = format!("0.0.0.0:62189");
+            let socket = UdpSocket::bind(bind_to).unwrap();
+
+            let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+            socket
+                .send_to(&rrq.clone().into_bytes(), server_addr)
+                .unwrap();
+
+            let mut buf = [0; MAX_PACKET_SIZE];
+            let (_, server) = socket.peek_from(&mut buf).unwrap();
+            socket.connect(server).unwrap();
+
+            let conn = Connection::new(socket);
+
+            let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+            let res = conn.get(res).unwrap();
+
+            assert_eq!(&exemplar[..], &res[..]);
+        }
+
+        server_thread.join().unwrap();
+    }
+    #[test]
+    fn test_prevent_duplicate() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+
+        let server_addr = "127.0.0.1:62190";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            let h = server.serve().unwrap();
+            let t1_handle = std::thread::spawn(move || {
+                h.handle().unwrap();
+            });
+            match server.serve() {
+                Err(e) => assert_eq!(e.kind(), io::ErrorKind::AddrNotAvailable),
+                _ => (),
+            };
+            t1_handle.join().unwrap();
+        });
+        {
+            let bind_to = format!("0.0.0.0:62191");
+            let socket = UdpSocket::bind(bind_to).unwrap();
+
+            let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+            socket
+                .send_to(&rrq.clone().into_bytes(), server_addr)
+                .unwrap();
+
+            let mut buf = [0; MAX_PACKET_SIZE];
+            let (_, server) = socket.peek_from(&mut buf).unwrap();
+            socket.connect(server).unwrap();
+
+            let conn = Connection::new(socket);
+
+            let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+            let res = conn.get(res).unwrap();
+
+            assert_eq!(&exemplar[..], &res[..]);
+        }
+        {
+            let bind_to = format!("0.0.0.0:62191");
+            let socket = UdpSocket::bind(bind_to).unwrap();
+
+            let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+            socket
+                .send_to(&rrq.clone().into_bytes(), server_addr)
+                .unwrap();
+        }
+
+        server_thread.join().unwrap();
+    }
+    #[test]
+    fn test_concurrent_connections() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+        let n = 4;
+        let server_addr = "127.0.0.1:62192";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            let mut joins = Vec::with_capacity(n);
+            for _ in 0..n {
+                let h = server.serve().unwrap();
+                joins.push(Some(std::thread::spawn(move || {
+                    h.handle().unwrap();
+                })));
+            }
+            for i in 0..n {
+                joins[i].take().unwrap().join().unwrap();
+            }
+        });
+        let mut joins = Vec::with_capacity(n);
+        for i in 0..n {
+            joins.push(Some(std::thread::spawn(move || {
+                let bind_to = format!("0.0.0.0:{}", 62193 + i);
+                let socket = UdpSocket::bind(bind_to).unwrap();
+
+                let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+                socket
+                    .send_to(&rrq.clone().into_bytes(), server_addr)
+                    .unwrap();
+
+                let mut buf = [0; MAX_PACKET_SIZE];
+                let (_, server) = socket.peek_from(&mut buf).unwrap();
+                socket.connect(server).unwrap();
+
+                let conn = Connection::new(socket);
+
+                let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+                let res = conn.get(res).unwrap();
+
+                assert_eq!(&exemplar[..], &res[..]);
+            })));
+        }
+        for i in 0..n {
+            joins[i].take().unwrap().join().unwrap();
+        }
+
+        server_thread.join().unwrap();
+    }
+}
