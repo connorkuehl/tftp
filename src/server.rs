@@ -12,11 +12,13 @@ use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
 use crate::connection::MIN_PORT_NUMBER;
 use crate::packet::*;
+use crate::RetransmissionConfig;
 
 /// A TFTP server.
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
+    retransmission_config: RetransmissionConfig,
 }
 
 impl Server {
@@ -27,6 +29,7 @@ impl Server {
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
+            retransmission_config: RetransmissionConfig::default(),
         })
     }
 
@@ -42,6 +45,17 @@ impl Server {
         let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
 
         Self::new(bind_to, serve_from).map(|server| (port, server))
+    }
+
+    /// Set the server's retransmission config
+    pub fn set_retransmission_config(
+        &mut self,
+        retransmission_config: RetransmissionConfig,
+    ) -> Result<()> {
+        self.socket
+            .set_read_timeout(retransmission_config.timeout().copied())?;
+        self.retransmission_config = retransmission_config;
+        Ok(())
     }
 
     /// Waits for requests and returns a `Handler` instance.
@@ -78,7 +92,13 @@ impl Server {
         let addr = self.socket.local_addr()?.ip().to_string();
         let bind_to = format!("{}:{}", addr, port);
 
-        Handler::new(bind_to, src_addr, direction, self.serve_dir.clone())
+        Handler::new(
+            bind_to,
+            src_addr,
+            direction,
+            self.serve_dir.clone(),
+            self.retransmission_config,
+        )
     }
 }
 
@@ -92,6 +112,8 @@ pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
+
+    retransmission_config: RetransmissionConfig,
 }
 
 impl Handler {
@@ -100,14 +122,17 @@ impl Handler {
         client: B,
         direction: Direction,
         serve_dir: PathBuf,
+        retransmission_config: RetransmissionConfig,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
+        socket.set_read_timeout(retransmission_config.timeout().copied())?;
 
         Ok(Handler {
             socket,
             direction,
             serve_dir,
+            retransmission_config,
         })
     }
 
@@ -132,7 +157,10 @@ impl Handler {
                     return Err(io::Error::from(error));
                 }
             };
-            let conn = Connection::new(self.socket);
+            let conn = Connection::new(
+                self.socket,
+                self.retransmission_config.max_retransmissions(),
+            );
             conn.put(f)?;
             Ok(())
         } else {
@@ -158,7 +186,7 @@ impl Handler {
             let ack = Packet::ack(Block::new(0));
             let _ = self.socket.send(&ack.into_bytes()[..])?;
 
-            let conn = Connection::new(self.socket);
+            let conn = Connection::new(self.socket, None);
             conn.get(f)?;
             Ok(())
         } else {

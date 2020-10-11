@@ -39,6 +39,52 @@
 
 #![deny(missing_docs)]
 
+/// Configures if and how we should retransmit packets if we don't get a response
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum RetransmissionConfig {
+    /// Do not retransmit packets. Just error out.
+    NoRetransmission,
+
+    /// Retransmit packets indefinitely
+    ForeverAfter {
+        /// How long should we wait before retransmitting?
+        timeout: std::time::Duration,
+    },
+
+    /// Retransmit packets a limited amount of times
+    NTimesAfter {
+        /// How long should we wait before retransmitting?
+        timeout: std::time::Duration,
+
+        /// How many times should we retransmit?
+        limit: std::num::NonZeroUsize,
+    },
+}
+
+impl Default for RetransmissionConfig {
+    fn default() -> Self {
+        Self::NoRetransmission
+    }
+}
+
+// Adapts the new, enum-based, representation to what `UdpSocket::set_read_timeout` and `Connection::new` want
+impl RetransmissionConfig {
+    fn timeout(&self) -> Option<&std::time::Duration> {
+        match self {
+            Self::NoRetransmission => None,
+            Self::ForeverAfter { timeout } | Self::NTimesAfter { timeout, .. } => Some(timeout),
+        }
+    }
+
+    fn max_retransmissions(&self) -> Option<usize> {
+        match self {
+            Self::NoRetransmission => Some(0),
+            Self::ForeverAfter { .. } => None,
+            Self::NTimesAfter { limit, .. } => Some(limit.get()),
+        }
+    }
+}
+
 mod bytes;
 pub mod client;
 mod connection;
