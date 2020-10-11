@@ -16,15 +16,15 @@ use crate::connection::Connection;
 use crate::connection::MIN_PORT_NUMBER;
 use crate::packet::*;
 
+// Active clients type alias
+type ClientsPool = Arc<Mutex<HashSet<SocketAddr>>>;
+
 /// A TFTP server.
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
-    active_clients: Arc<Mutex<HashSet<SocketAddr>>>,
+    active_clients: ClientsPool,
 }
-
-// Callback function type alias
-type Callback = Option<Box<dyn FnOnce() + Send>>;
 
 impl Server {
     /// Creates a server configured to serve files from a given directory on
@@ -65,16 +65,12 @@ impl Server {
     pub fn serve(&self) -> Result<Handler> {
         let mut buf = [0; MAX_PACKET_SIZE];
         let (nbytes, src_addr) = self.socket.recv_from(&mut buf)?;
+
+        // Try to create a callback. Will fail if this client TID is already in use.
+        let callback = ActiveClientCallback::create(&self.active_clients, &src_addr)?;
+
         let rrq = Packet::<Rrq>::from_bytes(&buf[..nbytes]);
         let wrq = Packet::<Wrq>::from_bytes(&buf[..nbytes]);
-
-        if !self.active_clients.lock().unwrap().insert(src_addr) {
-            // The src_addr is already in the set.
-            return Err(io::Error::new(
-                io::ErrorKind::AddrNotAvailable,
-                "Client TID already connected.",
-            ));
-        }
 
         let direction = if let Ok(rq) = rrq {
             Direction::Get(rq)
@@ -94,11 +90,6 @@ impl Server {
         let addr = self.socket.local_addr()?.ip().to_string();
         let bind_to = format!("{}:{}", addr, port);
 
-        let active_clients = Arc::clone(&self.active_clients);
-        let callback: Callback = Some(Box::new(move || {
-            active_clients.lock().unwrap().remove(&src_addr);
-        }));
-
         Handler::new(
             bind_to,
             src_addr,
@@ -114,12 +105,40 @@ enum Direction {
     Put(Packet<Wrq>),
 }
 
+struct ActiveClientCallback {
+    pool: ClientsPool,  // All the clients
+    client: SocketAddr, // This client's src_addr
+}
+
+impl ActiveClientCallback {
+    pub fn create(
+        active_clients: &ClientsPool,
+        client: &SocketAddr,
+    ) -> Result<ActiveClientCallback> {
+        if !active_clients.lock().unwrap().insert(*client) {
+            // This client is already in use
+            Err(io::Error::new(
+                io::ErrorKind::AddrNotAvailable,
+                "Client TID taken.",
+            ))
+        } else {
+            Ok(ActiveClientCallback {
+                pool: active_clients.clone(),
+                client: *client,
+            })
+        }
+    }
+    pub fn finish(self) {
+        self.pool.lock().unwrap().remove(&self.client);
+    }
+}
+
 /// Handles a request from a single TFTP client.
 pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
-    callback: Callback,
+    callback: Option<ActiveClientCallback>,
 }
 
 impl Handler {
@@ -128,10 +147,11 @@ impl Handler {
         client: B,
         direction: Direction,
         serve_dir: PathBuf,
-        callback: Callback,
+        callback: ActiveClientCallback,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
+        let callback = Some(callback);
 
         Ok(Handler {
             socket,
@@ -143,15 +163,12 @@ impl Handler {
 
     /// Completes the handshake with the client and services the request.
     pub fn handle(mut self) -> Result<()> {
-        let callback = match self.callback.take() {
-            Some(l) => l,
-            None => Box::new(|| {}),
-        };
+        let callback = self.callback.take().unwrap();
         let result = match self.direction {
             Direction::Get(_) => self.get(),
             Direction::Put(_) => self.put(),
         };
-        callback();
+        callback.finish();
         result
     }
 
@@ -254,14 +271,14 @@ mod tests {
         let server_addr = "127.0.0.1:62188";
         let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
         let server = Server::new(server_addr, wd).unwrap();
-
+        let n = 3;
         let server_thread = std::thread::spawn(move || {
-            for _ in 0..3 {
+            for _ in 0..n {
                 let h = server.serve().unwrap();
                 h.handle().unwrap();
             }
         });
-        for _ in 0..3 {
+        for _ in 0..n {
             let bind_to = format!("0.0.0.0:62189");
             let socket = UdpSocket::bind(bind_to).unwrap();
 
@@ -302,39 +319,32 @@ mod tests {
             });
             match server.serve() {
                 Err(e) => assert_eq!(e.kind(), io::ErrorKind::AddrNotAvailable),
-                _ => (),
+                _ => panic!("Should get error."),
             };
             t1_handle.join().unwrap();
         });
-        {
-            let bind_to = format!("0.0.0.0:62191");
-            let socket = UdpSocket::bind(bind_to).unwrap();
 
-            let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
-            socket
-                .send_to(&rrq.clone().into_bytes(), server_addr)
-                .unwrap();
+        let bind_to = format!("0.0.0.0:62191");
+        let socket = UdpSocket::bind(bind_to).unwrap();
+        let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
 
-            let mut buf = [0; MAX_PACKET_SIZE];
-            let (_, server) = socket.peek_from(&mut buf).unwrap();
-            socket.connect(server).unwrap();
+        socket
+            .send_to(&rrq.clone().into_bytes(), server_addr)
+            .unwrap();
+        socket
+            .send_to(&rrq.clone().into_bytes(), server_addr)
+            .unwrap();
 
-            let conn = Connection::new(socket);
+        let mut buf = [0; MAX_PACKET_SIZE];
+        let (_, server) = socket.peek_from(&mut buf).unwrap();
+        socket.connect(server).unwrap();
 
-            let res: Vec<u8> = Vec::with_capacity(exemplar.len());
-            let res = conn.get(res).unwrap();
+        let conn = Connection::new(socket);
 
-            assert_eq!(&exemplar[..], &res[..]);
-        }
-        {
-            let bind_to = format!("0.0.0.0:62191");
-            let socket = UdpSocket::bind(bind_to).unwrap();
+        let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+        let res = conn.get(res).unwrap();
 
-            let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
-            socket
-                .send_to(&rrq.clone().into_bytes(), server_addr)
-                .unwrap();
-        }
+        assert_eq!(&exemplar[..], &res[..]);
 
         server_thread.join().unwrap();
     }
@@ -353,17 +363,17 @@ mod tests {
             let mut joins = Vec::with_capacity(n);
             for _ in 0..n {
                 let h = server.serve().unwrap();
-                joins.push(Some(std::thread::spawn(move || {
+                joins.push(std::thread::spawn(move || {
                     h.handle().unwrap();
-                })));
+                }));
             }
-            for i in 0..n {
-                joins[i].take().unwrap().join().unwrap();
+            for join in joins {
+                join.join().unwrap();
             }
         });
         let mut joins = Vec::with_capacity(n);
         for i in 0..n {
-            joins.push(Some(std::thread::spawn(move || {
+            joins.push(std::thread::spawn(move || {
                 let bind_to = format!("0.0.0.0:{}", 62193 + i);
                 let socket = UdpSocket::bind(bind_to).unwrap();
 
@@ -382,10 +392,10 @@ mod tests {
                 let res = conn.get(res).unwrap();
 
                 assert_eq!(&exemplar[..], &res[..]);
-            })));
+            }));
         }
-        for i in 0..n {
-            joins[i].take().unwrap().join().unwrap();
+        for join in joins {
+            join.join().unwrap();
         }
 
         server_thread.join().unwrap();
