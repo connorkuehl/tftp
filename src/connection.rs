@@ -33,10 +33,11 @@ impl Connection {
                 return Err(err);
             }
 
-            let ack = Packet::ack(data.body.block);
+            let payload_size = data.body.data.len();
+            let ack = Packet::<Ack>::from(data);
             let _ = self.socket.send(&ack.into_bytes()[..])?;
 
-            if data.body.data.len() < MAX_PAYLOAD_SIZE {
+            if payload_size < MAX_PAYLOAD_SIZE {
                 break;
             }
         }
