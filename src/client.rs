@@ -14,10 +14,7 @@ use crate::packet::*;
 use crate::RetransmissionConfig;
 
 /// The initial state for building a `Client`.
-pub struct New {
-    socket: UdpSocket,
-    retransmission_config: Option<RetransmissionConfig>,
-}
+pub struct New(());
 
 /// An intermediate state for building a `Client`.Builder
 ///
@@ -25,50 +22,47 @@ pub struct New {
 /// it needs to construct a client.
 pub struct ConnectTo {
     server: Vec<SocketAddr>,
-    socket: UdpSocket,
-    retransmission_config: Option<RetransmissionConfig>,
 }
 
 /// Builds a `Client`.
 pub struct Builder<T> {
     data: T,
+    retransmission_config: RetransmissionConfig,
+    socket: UdpSocket,
 }
 
 /// Represents a single connection with a TFTP server.
 pub struct Client {
     server: Vec<SocketAddr>,
     socket: UdpSocket,
-    retransmission_config: Option<RetransmissionConfig>,
+    retransmission_config: RetransmissionConfig,
 }
 
 impl Builder<New> {
     /// Generates a Transfer ID (a bind address & port) and opens a `UdpSocket`
     /// for this connection.
-    pub fn new(retransmission_config: Option<RetransmissionConfig>) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
         let bind_to = format!("0.0.0.0:{}", port);
         let socket = UdpSocket::bind(bind_to)?;
-        socket.set_read_timeout(retransmission_config.map(|conf| conf.timeout))?;
 
-        let data = New {
+        Ok(Builder {
+            data: New(()),
+            retransmission_config: RetransmissionConfig::default(),
             socket,
-            retransmission_config,
-        };
-
-        Ok(Builder { data })
+        })
     }
 
     /// Stores the Transfer ID (address + port) of the server to connect to.
     pub fn connect_to<A: ToSocketAddrs>(self, server: A) -> Result<Builder<ConnectTo>> {
-        let resolved = server.to_socket_addrs()?.collect();
-        let data = ConnectTo {
-            server: resolved,
-            socket: self.data.socket,
-            retransmission_config: self.data.retransmission_config,
-        };
-
-        Ok(Builder { data })
+        Ok(Builder {
+            data: ConnectTo {
+                server: server.to_socket_addrs()?.collect(),
+            },
+            socket: self.socket,
+            retransmission_config: self.retransmission_config,
+        })
     }
 }
 
@@ -77,20 +71,35 @@ impl Builder<ConnectTo> {
     pub fn build(self) -> Client {
         Client {
             server: self.data.server,
-            socket: self.data.socket,
-            retransmission_config: self.data.retransmission_config,
+            socket: self.socket,
+            retransmission_config: self.retransmission_config,
         }
     }
 
-    /// Creates an instance with a different socket from the origninal instance.
+    /// Creates an instance with a different socket from the original instance.
     pub fn try_clone(&self) -> Result<Self> {
-        let new_sock_builder = Builder::new(self.data.retransmission_config)?;
+        let new_sock_builder = Builder::new()?;
         let data = ConnectTo {
             server: self.data.server.clone(),
-            socket: new_sock_builder.data.socket,
-            retransmission_config: self.data.retransmission_config,
         };
-        Ok(Builder { data })
+        Ok(Builder {
+            data,
+            retransmission_config: self.retransmission_config,
+            socket: new_sock_builder.socket,
+        })
+    }
+}
+
+impl<T> Builder<T> {
+    /// Set the future client's retransmission config
+    pub fn with_retransmission_config(
+        mut self,
+        retransmission_config: RetransmissionConfig,
+    ) -> Result<Self> {
+        self.retransmission_config = retransmission_config;
+        self.socket
+            .set_read_timeout(retransmission_config.timeout().copied())?;
+        Ok(self)
     }
 }
 
@@ -108,8 +117,7 @@ impl Client {
 
         let conn = Connection::new(
             self.socket,
-            self.retransmission_config
-                .and_then(|conf| conf.max_retransmissions),
+            self.retransmission_config.max_retransmissions(),
         );
         conn.get(writer)
     }
@@ -135,8 +143,7 @@ impl Client {
 
         let conn = Connection::new(
             self.socket,
-            self.retransmission_config
-                .and_then(|conf| conf.max_retransmissions),
+            self.retransmission_config.max_retransmissions(),
         );
         conn.put(reader)
     }

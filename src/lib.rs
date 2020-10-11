@@ -39,21 +39,50 @@
 
 #![deny(missing_docs)]
 
-/// POD struct representing the configuration of the retransmission of packets
-// NB: this is a struct so that you can only specify max_retransmissions if you specify a time :>
+/// Configures if and how we should retransmit packets if we don't get a response
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct RetransmissionConfig {
-    /// How long should we wait for a reply before retransmitting the last packet?
-    timeout: std::time::Duration,
+pub enum RetransmissionConfig {
+    /// Do not retransmit packets. Just error out.
+    NoRetransmission,
 
-    /// How many times should we retransmit the last packet?
-    ///
-    /// Note that this is the number of *retransmissions*, not transmissions, so
-    /// this means that setting this to `Some(0)` means that the packet will still be
-    /// sent once.
-    ///
-    /// If this is set to `None`, the packet will be retransmitted indefinitely.
-    max_retransmissions: Option<usize>,
+    /// Retransmit packets indefinitely
+    ForeverAfter {
+        /// How long should we wait before retransmitting?
+        timeout: std::time::Duration,
+    },
+
+    /// Retransmit packets a limited amount of times
+    NTimesAfter {
+        /// How long should we wait before retransmitting?
+        timeout: std::time::Duration,
+
+        /// How many times should we retransmit?
+        limit: std::num::NonZeroUsize,
+    },
+}
+
+impl Default for RetransmissionConfig {
+    fn default() -> Self {
+        Self::NoRetransmission
+    }
+}
+
+// Adapts the new, enum-based, representation to what `UdpSocket::set_read_timeout` and `Connection::new` want
+impl RetransmissionConfig {
+    fn timeout(&self) -> Option<&std::time::Duration> {
+        match self {
+            Self::NoRetransmission => None,
+            Self::ForeverAfter { timeout } | Self::NTimesAfter { timeout, .. } => Some(timeout),
+        }
+    }
+
+    fn max_retransmissions(&self) -> Option<usize> {
+        match self {
+            Self::NoRetransmission => Some(0),
+            Self::ForeverAfter { .. } => None,
+            Self::NTimesAfter { limit, .. } => Some(limit.get()),
+        }
+    }
 }
 
 mod bytes;

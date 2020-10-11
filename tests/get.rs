@@ -12,7 +12,7 @@ fn test_get() {
     ));
 
     let serve_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts");
-    let (port, server) = Server::random_port("127.0.0.1", serve_dir, None).unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir).unwrap();
     let server_addr = format!("127.0.0.1:{}", port);
 
     let server_thread = thread::spawn(move || {
@@ -20,7 +20,7 @@ fn test_get() {
         handler.handle().unwrap();
     });
 
-    let client = client::Builder::new(None)
+    let client = client::Builder::new()
         .unwrap()
         .connect_to(server_addr)
         .unwrap()
@@ -54,7 +54,7 @@ impl io::Write for ErroneousWriter {
 fn test_get_sends_error() {
     // Create our server
     let serve_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts");
-    let (port, server) = Server::random_port("127.0.0.1", serve_dir, None).unwrap();
+    let (port, server) = Server::random_port("127.0.0.1", serve_dir).unwrap();
     let server_addr = format!("127.0.0.1:{}", port);
 
     // Start a thread running its mainloop
@@ -64,7 +64,7 @@ fn test_get_sends_error() {
     });
 
     // Create our client
-    let client = client::Builder::new(None)
+    let client = client::Builder::new()
         .unwrap()
         .connect_to(server_addr)
         .unwrap()

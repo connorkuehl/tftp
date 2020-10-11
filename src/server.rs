@@ -18,22 +18,18 @@ use crate::RetransmissionConfig;
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
-    retransmission_config: Option<RetransmissionConfig>,
+    retransmission_config: RetransmissionConfig,
 }
 
 impl Server {
     /// Creates a server configured to serve files from a given directory on
     /// a given address.
-    pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(
-        bind_to: A,
-        serve_from: P,
-        retransmission_config: Option<RetransmissionConfig>,
-    ) -> Result<Self> {
+    pub fn new<A: ToSocketAddrs, P: AsRef<Path>>(bind_to: A, serve_from: P) -> Result<Self> {
         let socket = UdpSocket::bind(bind_to)?;
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
-            retransmission_config,
+            retransmission_config: RetransmissionConfig::default(),
         })
     }
 
@@ -43,13 +39,23 @@ impl Server {
     pub fn random_port<A: AsRef<str>, P: AsRef<Path>>(
         ip_addr: A,
         serve_from: P,
-        retransmission_config: Option<RetransmissionConfig>,
     ) -> Result<(u16, Self)> {
         let mut rng = rand::thread_rng();
         let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
         let bind_to = format!("{}:{}", ip_addr.as_ref(), port);
 
-        Self::new(bind_to, serve_from, retransmission_config).map(|server| (port, server))
+        Self::new(bind_to, serve_from).map(|server| (port, server))
+    }
+
+    /// Set the server's retransmission config
+    pub fn set_retransmission_config(
+        &mut self,
+        retransmission_config: RetransmissionConfig,
+    ) -> Result<()> {
+        self.socket
+            .set_read_timeout(retransmission_config.timeout().copied())?;
+        self.retransmission_config = retransmission_config;
+        Ok(())
     }
 
     /// Waits for requests and returns a `Handler` instance.
@@ -107,7 +113,7 @@ pub struct Handler {
     direction: Direction,
     serve_dir: PathBuf,
 
-    retransmission_config: Option<RetransmissionConfig>,
+    retransmission_config: RetransmissionConfig,
 }
 
 impl Handler {
@@ -116,11 +122,11 @@ impl Handler {
         client: B,
         direction: Direction,
         serve_dir: PathBuf,
-        retransmission_config: Option<RetransmissionConfig>,
+        retransmission_config: RetransmissionConfig,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
-        socket.set_read_timeout(retransmission_config.map(|conf| conf.timeout))?;
+        socket.set_read_timeout(retransmission_config.timeout().copied())?;
 
         Ok(Handler {
             socket,
@@ -153,8 +159,7 @@ impl Handler {
             };
             let conn = Connection::new(
                 self.socket,
-                self.retransmission_config
-                    .and_then(|conf| conf.max_retransmissions),
+                self.retransmission_config.max_retransmissions(),
             );
             conn.put(f)?;
             Ok(())

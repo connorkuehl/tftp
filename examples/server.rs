@@ -7,7 +7,7 @@ fn main() {
     let addr = args.next().unwrap();
     let wd = args.next().unwrap();
 
-    let server = Server::new(addr.clone(), wd, None).unwrap();
+    let server = Server::new(addr.clone(), wd).unwrap();
     println!("Serving Trivial File Transfer Protocol (TFTP) @ {}", addr);
 
     while let Ok(h) = server.serve() {

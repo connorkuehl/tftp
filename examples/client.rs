@@ -30,7 +30,7 @@ fn main() {
     let verb = args.next().unwrap();
     let file = args.next().unwrap();
 
-    let client = client::Builder::new(None)
+    let client = client::Builder::new()
         .unwrap()
         .connect_to(server)
         .unwrap()
