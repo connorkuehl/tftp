@@ -8,7 +8,7 @@ use crate::packet::*;
 /*
  * TODO: Probably add support for timeouts and retransmissions */
 
-pub const MIN_PORT_NUMBER: u16 = 1001;
+pub const MIN_PORT_NUMBER: u16 = 1024;
 
 pub struct Connection {
     socket: UdpSocket,
