@@ -109,10 +109,7 @@ impl Connection {
 
             // If the data payload length is less than the maximum, then this is the last block
             if data.body.data.len() < MAX_PAYLOAD_SIZE {
-                // FIXME: we should "dally" a bit and see if we get the last
-                // data packet again, which would mean that the other end of the
-                // connection did not receive our last ACK and we should
-                // therefore repeat it (see RFC1350 §6 Normal Termination)
+                // FIXME: https://github.com/connorkuehl/tftp/issues/56
                 break;
             }
         }
