@@ -141,7 +141,7 @@ impl Handler {
 
     /// Completes the handshake with the client and services the request.
     pub fn handle(mut self) -> Result<()> {
-        let client = self.client.clone();
+        let client = self.client;
         let clients_pool = self.clients_pool.take().unwrap();
         let result = match self.direction {
             Direction::Get(_) => self.get(),
