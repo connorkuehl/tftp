@@ -23,7 +23,7 @@ type ClientsPool = Arc<Mutex<HashSet<SocketAddr>>>;
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
-    active_clients: ClientsPool,
+    active_clients_pool: ClientsPool,
 }
 
 impl Server {
@@ -34,7 +34,7 @@ impl Server {
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
-            active_clients: Arc::new(Mutex::new(HashSet::new())),
+            active_clients_pool: Arc::new(Mutex::new(HashSet::new())),
         })
     }
 
@@ -66,8 +66,13 @@ impl Server {
         let mut buf = [0; MAX_PACKET_SIZE];
         let (nbytes, src_addr) = self.socket.recv_from(&mut buf)?;
 
-        // Try to create a callback. Will fail if this client TID is already in use.
-        let callback = ActiveClientCallback::create(&self.active_clients, &src_addr)?;
+        // Try to create a callback. Fail if this client TID is already in use.
+        if !self.active_clients_pool.lock().unwrap().insert(src_addr) {
+            return Err(io::Error::new(
+                io::ErrorKind::AddrNotAvailable,
+                "Client TID taken.",
+            ));
+        }
 
         let rrq = Packet::<Rrq>::from_bytes(&buf[..nbytes]);
         let wrq = Packet::<Wrq>::from_bytes(&buf[..nbytes]);
@@ -95,7 +100,7 @@ impl Server {
             src_addr,
             direction,
             self.serve_dir.clone(),
-            callback,
+            self.active_clients_pool.clone(),
         )
     }
 }
@@ -105,70 +110,44 @@ enum Direction {
     Put(Packet<Wrq>),
 }
 
-struct ActiveClientCallback {
-    pool: ClientsPool,  // All the clients
-    client: SocketAddr, // This client's src_addr
-}
-
-impl ActiveClientCallback {
-    pub fn create(
-        active_clients: &ClientsPool,
-        client: &SocketAddr,
-    ) -> Result<ActiveClientCallback> {
-        if !active_clients.lock().unwrap().insert(*client) {
-            // This client is already in use
-            Err(io::Error::new(
-                io::ErrorKind::AddrNotAvailable,
-                "Client TID taken.",
-            ))
-        } else {
-            Ok(ActiveClientCallback {
-                pool: active_clients.clone(),
-                client: *client,
-            })
-        }
-    }
-    pub fn finish(self) {
-        self.pool.lock().unwrap().remove(&self.client);
-    }
-}
-
 /// Handles a request from a single TFTP client.
 pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
-    callback: Option<ActiveClientCallback>,
+    client: SocketAddr,
+    clients_pool: Option<ClientsPool>,
 }
 
 impl Handler {
-    fn new<A: ToSocketAddrs, B: ToSocketAddrs>(
+    fn new<A: ToSocketAddrs>(
         bind: A,
-        client: B,
+        client: SocketAddr,
         direction: Direction,
         serve_dir: PathBuf,
-        callback: ActiveClientCallback,
+        clients_pool: ClientsPool,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
-        let callback = Some(callback);
-
+        let clients_pool = Some(clients_pool);
         Ok(Handler {
             socket,
             direction,
             serve_dir,
-            callback,
+            client,
+            clients_pool,
         })
     }
 
     /// Completes the handshake with the client and services the request.
     pub fn handle(mut self) -> Result<()> {
-        let callback = self.callback.take().unwrap();
+        let client = self.client.clone();
+        let clients_pool = self.clients_pool.take().unwrap();
         let result = match self.direction {
             Direction::Get(_) => self.get(),
             Direction::Put(_) => self.put(),
         };
-        callback.finish();
+        clients_pool.lock().unwrap().remove(&client);
         result
     }
 
