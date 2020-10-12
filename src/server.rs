@@ -112,7 +112,6 @@ pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
-
     retransmission_config: RetransmissionConfig,
 }
 
