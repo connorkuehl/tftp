@@ -58,5 +58,4 @@ EXPOSE 6655
 COPY --from=build /build/target/debug/examples/server /usr/local/bin
 WORKDIR /usr/local/bin
 
-CMD ["echo", "hi"]
 CMD ["./server", "0.0.0.0:6655", "./artifacts"]
