@@ -53,9 +53,13 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     pkg-config \
     libssl-dev
 
-EXPOSE 6655
+#EXPOSE 6655
 
 COPY --from=build /build/target/debug/examples/server /usr/local/bin
+
+RUN mkdir /usr/local/bin/artifacts
+COPY --from=build /build/artifacts /usr/local/bin/artifacts
+
 WORKDIR /usr/local/bin
 
 CMD ["./server", "0.0.0.0:6655", "./artifacts"]
