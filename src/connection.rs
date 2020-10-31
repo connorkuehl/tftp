@@ -40,10 +40,10 @@ impl Connection {
             let ack = Packet::<Ack>::from(data);
 
             if payload_size < MAX_PAYLOAD_SIZE {
+                self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
                 loop {
                     let _ = self.socket.send(&ack.clone().into_bytes()[..])?;
 
-                    self.socket.set_read_timeout(Some(Duration::new(3, 0)))?;
                     if let Err(err) = self.socket.recv(&mut buf) {
                         match err.kind() {
                             io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
