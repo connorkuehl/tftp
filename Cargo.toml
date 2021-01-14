@@ -6,7 +6,7 @@ edition = "2018"
 license = "Apache-2.0"
 
 [badges]
-travis-ci = { repository = "connorkuehl/tftp", branch = "main" }
+github = { repository = "connorkuehl/tftp", workflow = "test" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

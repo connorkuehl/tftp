@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/connorkuehl/tftp.svg?branch=main)](https://travis-ci.com/connorkuehl/tftp)
+[![Workflow Status](https://github.com/connorkuehl/tftp/workflows/test/badge.svg)](https://github.com/connorkuehl/tftp/actions?query=workflow%3A%22test%22)
 
 # tftp
 
