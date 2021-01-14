@@ -126,11 +126,11 @@ mod tests {
         const INVALID_PACKET: &[u8] = b"this is an invalid packet. hopefully.";
 
         // Create our server socket
-        let server_port: u16 = rand::thread_rng().gen_range(MIN_PORT_NUMBER, u16::MAX);
+        let server_port: u16 = rand::thread_rng().gen_range(MIN_PORT_NUMBER..u16::MAX);
         let server_sock = UdpSocket::bind(("localhost", server_port)).unwrap();
 
         // Create our client socket
-        let client_port: u16 = rand::thread_rng().gen_range(MIN_PORT_NUMBER, u16::MAX);
+        let client_port: u16 = rand::thread_rng().gen_range(MIN_PORT_NUMBER..u16::MAX);
         let client_sock = UdpSocket::bind(("localhost", client_port)).unwrap();
 
         // Connect them together

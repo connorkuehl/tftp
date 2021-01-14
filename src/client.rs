@@ -42,7 +42,7 @@ impl Builder<New> {
     /// for this connection.
     pub fn new() -> Result<Self> {
         let mut rng = rand::thread_rng();
-        let port: u16 = rng.gen_range(MIN_PORT_NUMBER, u16::MAX);
+        let port: u16 = rng.gen_range(MIN_PORT_NUMBER..u16::MAX);
         let bind_to = format!("0.0.0.0:{}", port);
         let socket = UdpSocket::bind(bind_to)?;
 
