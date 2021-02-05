@@ -3,20 +3,27 @@
 
 use std::fs::OpenOptions;
 use std::io::{self, Result};
-use std::net::{ToSocketAddrs, UdpSocket};
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::path::{Path, PathBuf};
 
 use rand::Rng;
+use std::collections::HashSet;
+
+use std::sync::{Arc, Mutex};
 
 use crate::bytes::{FromBytes, IntoBytes};
 use crate::connection::Connection;
 use crate::connection::MIN_PORT_NUMBER;
 use crate::packet::*;
 
+// Active clients type alias
+type ClientsPool = Arc<Mutex<HashSet<SocketAddr>>>;
+
 /// A TFTP server.
 pub struct Server {
     socket: UdpSocket,
     serve_dir: PathBuf,
+    active_clients_pool: ClientsPool,
 }
 
 impl Server {
@@ -27,6 +34,7 @@ impl Server {
         Ok(Self {
             socket,
             serve_dir: serve_from.as_ref().to_owned(),
+            active_clients_pool: Arc::new(Mutex::new(HashSet::new())),
         })
     }
 
@@ -57,6 +65,15 @@ impl Server {
     pub fn serve(&self) -> Result<Handler> {
         let mut buf = [0; MAX_PACKET_SIZE];
         let (nbytes, src_addr) = self.socket.recv_from(&mut buf)?;
+
+        // Try to create a callback. Fail if this client TID is already in use.
+        if !self.active_clients_pool.lock().unwrap().insert(src_addr) {
+            return Err(io::Error::new(
+                io::ErrorKind::AddrNotAvailable,
+                "Client TID taken.",
+            ));
+        }
+
         let rrq = Packet::<Rrq>::from_bytes(&buf[..nbytes]);
         let wrq = Packet::<Wrq>::from_bytes(&buf[..nbytes]);
 
@@ -78,7 +95,13 @@ impl Server {
         let addr = self.socket.local_addr()?.ip().to_string();
         let bind_to = format!("{}:{}", addr, port);
 
-        Handler::new(bind_to, src_addr, direction, self.serve_dir.clone())
+        Handler::new(
+            bind_to,
+            src_addr,
+            direction,
+            self.serve_dir.clone(),
+            self.active_clients_pool.clone(),
+        )
     }
 }
 
@@ -92,31 +115,40 @@ pub struct Handler {
     socket: UdpSocket,
     direction: Direction,
     serve_dir: PathBuf,
+    client: SocketAddr,
+    clients_pool: Option<ClientsPool>,
 }
 
 impl Handler {
-    fn new<A: ToSocketAddrs, B: ToSocketAddrs>(
+    fn new<A: ToSocketAddrs>(
         bind: A,
-        client: B,
+        client: SocketAddr,
         direction: Direction,
         serve_dir: PathBuf,
+        clients_pool: ClientsPool,
     ) -> Result<Handler> {
         let socket = UdpSocket::bind(bind)?;
         socket.connect(client)?;
-
+        let clients_pool = Some(clients_pool);
         Ok(Handler {
             socket,
             direction,
             serve_dir,
+            client,
+            clients_pool,
         })
     }
 
     /// Completes the handshake with the client and services the request.
-    pub fn handle(self) -> Result<()> {
-        match self.direction {
+    pub fn handle(mut self) -> Result<()> {
+        let client = self.client;
+        let clients_pool = self.clients_pool.take().unwrap();
+        let result = match self.direction {
             Direction::Get(_) => self.get(),
             Direction::Put(_) => self.put(),
-        }
+        };
+        clients_pool.lock().unwrap().remove(&client);
+        result
     }
 
     fn get(self) -> Result<()> {
@@ -164,5 +196,187 @@ impl Handler {
         } else {
             panic!("handler direction is wrong");
         }
+    }
+}
+
+// These tests use hand-rolled partial client implmentations mostly copied from the proper implementation at client.rs.
+// This is because we need to simulate incorrect client behaviors, and the public client api won't let us do that.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_simple_use() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+
+        let server_addr = "127.0.0.1:62186";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            let h = server.serve().unwrap();
+            h.handle().unwrap();
+        });
+
+        let bind_to = format!("0.0.0.0:62187");
+        let socket = UdpSocket::bind(bind_to).unwrap();
+        let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+        socket
+            .send_to(&rrq.clone().into_bytes(), server_addr)
+            .unwrap();
+
+        let mut buf = [0; MAX_PACKET_SIZE];
+        let (_, server) = socket.peek_from(&mut buf).unwrap();
+        socket.connect(server).unwrap();
+
+        let conn = Connection::new(socket);
+
+        let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+        let res = conn.get(res).unwrap();
+
+        assert_eq!(&exemplar[..], &res[..]);
+
+        server_thread.join().unwrap();
+    }
+    #[test]
+    fn test_reuse_socket() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+
+        let server_addr = "127.0.0.1:62188";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+        let n = 3;
+        let server_thread = std::thread::spawn(move || {
+            for _ in 0..n {
+                let h = server.serve().unwrap();
+                h.handle().unwrap();
+            }
+        });
+        for _ in 0..n {
+            let bind_to = format!("0.0.0.0:62189");
+            let socket = UdpSocket::bind(bind_to).unwrap();
+
+            let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+            socket
+                .send_to(&rrq.clone().into_bytes(), server_addr)
+                .unwrap();
+
+            let mut buf = [0; MAX_PACKET_SIZE];
+            let (_, server) = socket.peek_from(&mut buf).unwrap();
+            socket.connect(server).unwrap();
+
+            let conn = Connection::new(socket);
+
+            let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+            let res = conn.get(res).unwrap();
+
+            assert_eq!(&exemplar[..], &res[..]);
+        }
+
+        server_thread.join().unwrap();
+    }
+    #[test]
+    fn test_prevent_duplicate() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+
+        let server_addr = "127.0.0.1:62190";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            let h = server.serve().unwrap();
+            let t1_handle = std::thread::spawn(move || {
+                h.handle().unwrap();
+            });
+            match server.serve() {
+                Err(e) => assert_eq!(e.kind(), io::ErrorKind::AddrNotAvailable),
+                _ => panic!("Should get error."),
+            };
+            t1_handle.join().unwrap();
+        });
+
+        let bind_to = format!("0.0.0.0:62191");
+        let socket = UdpSocket::bind(bind_to).unwrap();
+        let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+
+        socket
+            .send_to(&rrq.clone().into_bytes(), server_addr)
+            .unwrap();
+        socket
+            .send_to(&rrq.clone().into_bytes(), server_addr)
+            .unwrap();
+
+        let mut buf = [0; MAX_PACKET_SIZE];
+        let (_, server) = socket.peek_from(&mut buf).unwrap();
+        socket.connect(server).unwrap();
+
+        let conn = Connection::new(socket);
+
+        let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+        let res = conn.get(res).unwrap();
+
+        assert_eq!(&exemplar[..], &res[..]);
+
+        server_thread.join().unwrap();
+    }
+    #[test]
+    fn test_concurrent_connections() {
+        let exemplar = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/alice-in-wonderland.txt"
+        ));
+        let n = 4;
+        let server_addr = "127.0.0.1:62192";
+        let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts/");
+        let server = Server::new(server_addr, wd).unwrap();
+
+        let server_thread = std::thread::spawn(move || {
+            let mut joins = Vec::with_capacity(n);
+            for _ in 0..n {
+                let h = server.serve().unwrap();
+                joins.push(std::thread::spawn(move || {
+                    h.handle().unwrap();
+                }));
+            }
+            for join in joins {
+                join.join().unwrap();
+            }
+        });
+        let mut joins = Vec::with_capacity(n);
+        for i in 0..n {
+            joins.push(std::thread::spawn(move || {
+                let bind_to = format!("0.0.0.0:{}", 62193 + i);
+                let socket = UdpSocket::bind(bind_to).unwrap();
+
+                let rrq = Packet::rrq("alice-in-wonderland.txt", Mode::NetAscii);
+                socket
+                    .send_to(&rrq.clone().into_bytes(), server_addr)
+                    .unwrap();
+
+                let mut buf = [0; MAX_PACKET_SIZE];
+                let (_, server) = socket.peek_from(&mut buf).unwrap();
+                socket.connect(server).unwrap();
+
+                let conn = Connection::new(socket);
+
+                let res: Vec<u8> = Vec::with_capacity(exemplar.len());
+                let res = conn.get(res).unwrap();
+
+                assert_eq!(&exemplar[..], &res[..]);
+            }));
+        }
+        for join in joins {
+            join.join().unwrap();
+        }
+
+        server_thread.join().unwrap();
     }
 }
