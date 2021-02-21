@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Connor Kuehl <cipkuehl@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
+exclude = ["artifacts", "benchmarks", "examples"]
 
 [badges]
 github = { repository = "connorkuehl/tftp", workflow = "test" }
@@ -27,3 +28,7 @@ path = "examples/server.rs"
 [[example]]
 name = "server_with_threads"
 path = "examples/server_with_threads.rs"
+
+[profile.release]
+debug = true
+opt-level = 3
