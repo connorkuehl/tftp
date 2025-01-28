@@ -11,7 +11,7 @@ github = { repository = "connorkuehl/tftp", workflow = "test" }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8.2"
+rand = "0.9.0"
 
 [dev-dependencies]
 tempfile = "3.1.0"
